@@ -1,0 +1,86 @@
+{
+  ".oxlintrc.json": {
+    "mtime": 1789044426.9493434,
+    "seen": 1789049952.9635904,
+    "ast_hash": "25310a05add4474911f92433391bed5a",
+    "semantic_hash": "25310a05add4474911f92433391bed5a"
+  },
+  ".prettierrc.json": {
+    "mtime": 1789044426.9437852,
+    "seen": 1789049952.9635942,
+    "ast_hash": "81e1a85eb3522eed48d5095183125238",
+    "semantic_hash": "81e1a85eb3522eed48d5095183125238"
+  },
+  ".vscode/extensions.json": {
+    "mtime": 1789044426.9432344,
+    "seen": 1789049952.963596,
+    "ast_hash": "ab10c0fef4d2d250f090368be1a0bc16",
+    "semantic_hash": "ab10c0fef4d2d250f090368be1a0bc16"
+  },
+  "eslint.config.js": {
+    "mtime": 1789044426.9503434,
+    "seen": 1789049952.963597,
+    "ast_hash": "0634cbc6a781cc417c75654a4ce09683",
+    "semantic_hash": "0634cbc6a781cc417c75654a4ce09683"
+  },
+  "jsconfig.json": {
+    "mtime": 1789044426.9378002,
+    "seen": 1789049952.963598,
+    "ast_hash": "7e6d8df69731a24bb613611c46ff4669",
+    "semantic_hash": "7e6d8df69731a24bb613611c46ff4669"
+  },
+  "package.json": {
+    "mtime": 1789044426.9437852,
+    "seen": 1789049952.963599,
+    "ast_hash": "585899460e404fe705888cea10104f72",
+    "semantic_hash": "585899460e404fe705888cea10104f72"
+  },
+  "src/App.vue": {
+    "mtime": 1789044426.953633,
+    "seen": 1789049952.9636,
+    "ast_hash": "58f06fd59838a94a71439c71cde4a5c7",
+    "semantic_hash": "58f06fd59838a94a71439c71cde4a5c7"
+  },
+  "src/main.js": {
+    "mtime": 1789044426.953633,
+    "seen": 1789049952.9636009,
+    "ast_hash": "6adf0ae97ec3b66ab130d308cee67a77",
+    "semantic_hash": "6adf0ae97ec3b66ab130d308cee67a77"
+  },
+  "src/router/index.js": {
+    "mtime": 1789044426.953633,
+    "seen": 1789049952.9636016,
+    "ast_hash": "30c02eb779ccbd19b340af5baa8abbdb",
+    "semantic_hash": "30c02eb779ccbd19b340af5baa8abbdb"
+  },
+  "src/stores/counter.js": {
+    "mtime": 1789044426.9409182,
+    "seen": 1789049952.9636028,
+    "ast_hash": "d59fe2308d4bf67b9997286fa5adedde",
+    "semantic_hash": "d59fe2308d4bf67b9997286fa5adedde"
+  },
+  "vite.config.js": {
+    "mtime": 1789044426.9513435,
+    "seen": 1789049952.9636035,
+    "ast_hash": "68c0cddbe7dfa1f6b728a0f3b65634c2",
+    "semantic_hash": "68c0cddbe7dfa1f6b728a0f3b65634c2"
+  },
+  "AGENTS.md": {
+    "mtime": 1789049671.919727,
+    "seen": 1789049952.9636095,
+    "ast_hash": "625f06db59a06d2fe4cd5704ddbcee7a",
+    "semantic_hash": "625f06db59a06d2fe4cd5704ddbcee7a"
+  },
+  "README.md": {
+    "mtime": 1789044426.953633,
+    "seen": 1789049952.9636102,
+    "ast_hash": "6b61b7afd16fb42e3919949fc9cebc89",
+    "semantic_hash": "6b61b7afd16fb42e3919949fc9cebc89"
+  },
+  "index.html": {
+    "mtime": 1789044426.9376707,
+    "seen": 1789049952.9636192,
+    "ast_hash": "5d25aa995d12bd6a6e8476acd98d85a3",
+    "semantic_hash": "5d25aa995d12bd6a6e8476acd98d85a3"
+  }
+}
