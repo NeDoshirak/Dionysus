@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { confirmPasswordResetLocal, requestPasswordResetLocal } from '@/shared/api/local-adapters'
+import { confirmPasswordReset, requestPasswordReset } from '@/entities/session'
 import { validatePassword } from '@/shared/lib/validation'
 import { AuthFormFrame, BaseButton, BaseInput, CodeInput, StatusMessage } from '@/shared/ui'
 
@@ -40,7 +40,7 @@ async function requestCode() {
   }
   state.value = 'submitting'
   try {
-    const result = await requestPasswordResetLocal({ email: email.value.trim() })
+    const result = await requestPasswordReset({ email: email.value.trim() })
     email.value = result.email
     state.value = 'code'
     startTimer()
@@ -59,7 +59,7 @@ async function confirmCode() {
   }
   state.value = 'submitting'
   try {
-    await confirmPasswordResetLocal({ email: email.value, code: code.value, password: password.value })
+    await confirmPasswordReset({ email: email.value, code: code.value, newPassword: password.value })
     state.value = 'success'
   } catch {
     state.value = 'server-error'

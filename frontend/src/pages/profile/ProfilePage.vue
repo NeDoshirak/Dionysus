@@ -20,7 +20,7 @@ const initials = computed(() => 'АИ')
         <RouterLink class="profile-page__back" :to="{ name: 'projects' }">← Назад к проектам</RouterLink>
       </div>
       <ProfileForm :email="email" />
-      <section class="profile-page__sign-out"><h2>Сессия</h2><p>Локальная демонстрационная сессия не сохраняется на сервере.</p><SignOutButton /></section>
+      <section class="profile-page__sign-out"><h2>Сессия</h2><p>Выйдите из аккаунта на этом устройстве.</p><SignOutButton /></section>
     </main>
   </div>
 </template>

@@ -25,9 +25,9 @@ The browser must never call Whisper. It remains an internal backend dependency.
 
 ## Architecture
 
-Add one shared HTTP client that resolves `VITE_API_BASE_URL` (defaulting to `http://localhost:8000`), serializes JSON or preserves `FormData`, parses successful JSON where present, and normalizes non-success responses to `{ status, code, detail }`. It always includes credentials so the HttpOnly refresh cookie participates in the auth lifecycle.
+Add one shared HTTP client that resolves `VITE_API_BASE_URL` when supplied and otherwise uses same-origin `/api` paths, serializes JSON or preserves `FormData`, parses successful JSON where present, and normalizes non-success responses to `{ status, code, detail }`. It always includes credentials so the HttpOnly refresh cookie participates in the auth lifecycle.
 
-The app provider configures the client with session callbacks. A protected request sends the in-memory access token and, after one `401`, refreshes once and retries once. A failed refresh clears the session. This callback configuration keeps `shared` independent from `entities`, avoiding a same-layer entity import.
+The application entry point configures the client with session callbacks before the router is installed. A protected request sends the in-memory access token and, after one `401`, refreshes once and retries once. A failed refresh clears the session. This callback configuration keeps `shared` independent from `entities`, avoiding a same-layer entity import.
 
 `entities/session` owns registration, verification, login, refresh, logout, and current-user mapping. The session model stores the token and email in memory. Route metadata marks projects, profile, and specification protected; a router guard restores the session via refresh before admitting those routes and otherwise redirects to sign-in.
 
@@ -45,7 +45,7 @@ The app provider configures the client with session callbacks. A protected reque
 
 ## Development-server integration
 
-The backend presently has no CORS middleware. Configure Vite's development server to proxy `/api` to `http://localhost:8000`; the default API URL is therefore same-origin during development. `VITE_API_BASE_URL` remains available for deployed environments where CORS/proxy policy is configured externally.
+The backend presently has no CORS middleware. Configure Vite's development server to proxy `/api` to `http://localhost:8000`; the default API URL is therefore same-origin during development. `VITE_API_BASE_URL` remains available for deployed environments where CORS or reverse-proxy policy is configured externally.
 
 ## Error and security policy
 

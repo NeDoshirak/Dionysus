@@ -1,8 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { setSession } from '@/entities/session'
-import { signInLocal } from '@/shared/api/local-adapters'
+import { signIn } from '@/entities/session'
 import { validateEmail, validatePassword } from '@/shared/lib/validation'
 import { AuthFormFrame, BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
 
@@ -25,8 +24,7 @@ async function submitForm() {
 
   state.value = 'submitting'
   try {
-    const session = await signInLocal({ email: email.value.trim(), password: password.value })
-    setSession(session)
+    await signIn({ email: email.value.trim(), password: password.value })
     state.value = 'success'
     await router.push({ name: 'projects' })
   } catch (error) {
@@ -35,7 +33,7 @@ async function submitForm() {
       return
     }
     state.value = 'server-error'
-    errorMessage.value = error.code === 'invalid-credentials'
+    errorMessage.value = error.status === 401 || error.code === 'invalid-credentials'
       ? 'Неверный email или пароль.'
       : 'Не удалось войти. Попробуйте ещё раз.'
   }

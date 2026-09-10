@@ -1,11 +1,11 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { clearSession } from '@/entities/session'
+import { signOut as endSession } from '@/entities/session'
 
 const router = useRouter()
 
 async function signOut() {
-  clearSession()
+  await endSession()
   await router.push({ name: 'landing' })
 }
 </script>
