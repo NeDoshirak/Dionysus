@@ -1,74 +1,32 @@
 services:
   db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-dionysus}
-      POSTGRES_USER: ${POSTGRES_USER:-dionysus}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dionysus}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    restart: unless-stopped
+    # ports: удалить
 
   whisper:
-    image: onerahmet/openai-whisper-asr-webservice:latest
-    environment:
-      ASR_MODEL: ${WHISPER_MODEL:-small}
-      ASR_ENGINE: ${WHISPER_ENGINE:-faster_whisper}
-    ports:
-      - "9000:9000"
-    volumes:
-      - whisper_cache:/root/.cache
+    restart: unless-stopped
+    # ports: удалить
 
   valkey:
-    image: valkey/valkey:8-alpine
-    command: valkey-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - valkey_data:/data
+    restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      network: host
+    restart: unless-stopped
     environment:
+      ASPNETCORE_ENVIRONMENT: Production
       DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB:-dionysus};Username=${POSTGRES_USER:-dionysus};Password=${POSTGRES_PASSWORD:-dionysus}
       VALKEY_CONNECTION: valkey:6379
       JWT_KEY: ${JWT_KEY}
       AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
       WHISPER_URL: http://whisper:9000
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      whisper:
-        condition: service_started
-      valkey:
-        condition: service_healthy
+    # ports: удалить
 
   frontend:
-    build: ./frontend
+    restart: unless-stopped
     ports:
-      - "3000:80"
-    depends_on:
-      - backend
-
-volumes:
-  postgres_data:
-  whisper_cache:
-  valkey_data:
+      - "127.0.0.1:3000:80"
