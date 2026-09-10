@@ -8,6 +8,18 @@ using Xunit;
 public sealed class SpecificationPersistenceTests
 {
     [Fact]
+    public async Task Migrations_create_the_current_schema_from_an_empty_database()
+    {
+        await using var database = await PostgresDatabase.CreateEmptyAsync();
+        await using var db = database.CreateContext();
+
+        await db.Database.MigrateAsync();
+
+        Assert.Equal(3, await database.QueryIntAsync("SELECT COUNT(*) FROM \"__EFMigrationsHistory\""));
+        Assert.Equal(1, await database.QueryIntAsync("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'SpecificationAnalyses'"));
+    }
+
+    [Fact]
     public async Task Project_accepts_one_recording_and_one_analysis_only()
     {
         await using var database = await PostgresDatabase.CreateAsync();
@@ -43,7 +55,7 @@ public sealed class SpecificationPersistenceTests
     }
 
     [Fact]
-    public async Task Migration_preserves_legacy_recordings_and_designates_the_newest_as_current()
+    public async Task Migrations_preserve_legacy_recordings_after_the_baseline_is_recorded()
     {
         await using var database = await PostgresDatabase.CreateEmptyAsync();
         var projectId = Guid.NewGuid();
@@ -55,6 +67,8 @@ public sealed class SpecificationPersistenceTests
             CREATE TABLE "Projects" ("Id" uuid NOT NULL PRIMARY KEY);
             CREATE TABLE "VoiceRecordings" ("Id" uuid NOT NULL PRIMARY KEY, "ProjectEntityId" uuid NOT NULL, "CreatedAt" timestamp with time zone NOT NULL);
             CREATE INDEX "IX_VoiceRecordings_ProjectEntityId" ON "VoiceRecordings" ("ProjectEntityId");
+            CREATE TABLE "__EFMigrationsHistory" ("MigrationId" character varying(150) NOT NULL PRIMARY KEY, "ProductVersion" character varying(32) NOT NULL);
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES ('20260910100000_InitialCreate', '8.0.11');
             INSERT INTO "Projects" ("Id") VALUES ('{projectId}');
             INSERT INTO "VoiceRecordings" ("Id", "ProjectEntityId", "CreatedAt") VALUES ('{olderId}', '{projectId}', '{createdAt:O}'), ('{newerId}', '{projectId}', '{createdAt:O}');
             """);

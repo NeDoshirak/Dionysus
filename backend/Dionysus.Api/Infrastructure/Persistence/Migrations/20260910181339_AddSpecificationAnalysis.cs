@@ -11,11 +11,12 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("""
-                ALTER TABLE "VoiceRecordings"
-                ADD COLUMN IF NOT EXISTS "IsCurrent" boolean NOT NULL DEFAULT TRUE;
-                """);
-
+            migrationBuilder.AddColumn<bool>(
+                name: "IsCurrent",
+                table: "VoiceRecordings",
+                type: "boolean",
+                nullable: false,
+                defaultValue: true);
 
             migrationBuilder.Sql("""
                 WITH ranked_recordings AS (
