@@ -27,7 +27,7 @@ const email = computed(() => route.query.email || '')
 <style scoped lang="sass">
 .auth-page
   &__success
-    width: min(100%, 301px)
+    width: min(100%, 381px)
     margin: 0 auto
     text-align: center
 

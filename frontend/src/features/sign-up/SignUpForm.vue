@@ -64,7 +64,7 @@ async function submitForm() {
 <style scoped lang="sass">
 .sign-up-form
   display: grid
-  width: min(100%, 301px)
+  width: min(100%, 381px)
   margin: 0 auto
 
   &__brand, &__title, &__subtitle, &__footer

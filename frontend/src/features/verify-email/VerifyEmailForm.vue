@@ -10,10 +10,42 @@ const router = useRouter()
 const digits = ref(['', '', '', '', '', ''])
 const state = ref('initial')
 const serverError = ref('')
+const inputRefs = ref([])
 const code = computed(() => digits.value.join(''))
+const displayedEmail = computed(() => {
+  if (!props.email) return 'ваш email'
+  const [localPart, domain] = props.email.split('@')
+  if (!domain) return props.email
+  return `${localPart.slice(0, 1)}***@${domain}`
+})
 
 function setDigit(index, event) {
   digits.value[index] = event.target.value.replace(/\D/g, '').slice(-1)
+  if (digits.value[index] && index < digits.value.length - 1) {
+    inputRefs.value[index + 1]?.focus()
+  }
+}
+
+function setInputRef(element, index) {
+  if (element) inputRefs.value[index] = element
+}
+
+function handleKeydown(index, event) {
+  if (event.key === 'Backspace' && !digits.value[index] && index > 0) {
+    event.preventDefault()
+    inputRefs.value[index - 1]?.focus()
+  }
+}
+
+function handlePaste(index, event) {
+  const pastedDigits = event.clipboardData?.getData('text').replace(/\D/g, '').slice(0, digits.value.length - index)
+  if (!pastedDigits) return
+
+  event.preventDefault()
+  for (const [offset, digit] of [...pastedDigits].entries()) {
+    digits.value[index + offset] = digit
+  }
+  inputRefs.value[index + pastedDigits.length - 1]?.focus()
 }
 
 async function submitForm() {
@@ -40,11 +72,11 @@ async function submitForm() {
     <p class="verify-email-form__brand">SpecScribe</p>
     <div class="verify-email-form__badge" aria-hidden="true">@</div>
     <h1 class="verify-email-form__title">Подтвердите email</h1>
-    <p class="verify-email-form__subtitle">Отправили 6-значный код на <strong>{{ email || 'ваш email' }}</strong></p>
+    <p class="verify-email-form__subtitle">Отправили 6-значный код на <strong>{{ displayedEmail }}</strong></p>
     <StatusMessage v-if="state === 'server-error'" state="error">{{ serverError }}</StatusMessage>
     <StatusMessage v-if="state === 'success'" state="success">Email подтверждён.</StatusMessage>
     <div class="verify-email-form__digits" aria-label="Код подтверждения">
-      <input v-for="(_, index) in digits" :key="index" :value="digits[index]" class="verify-email-form__digit" inputmode="numeric" maxlength="1" :aria-label="`Цифра кода ${index + 1}`" @input="setDigit(index, $event)">
+      <input v-for="(_, index) in digits" :key="index" :ref="(element) => setInputRef(element, index)" :value="digits[index]" class="verify-email-form__digit" inputmode="numeric" maxlength="1" :aria-label="`Цифра кода ${index + 1}`" @input="setDigit(index, $event)" @keydown="handleKeydown(index, $event)" @paste="handlePaste(index, $event)">
     </div>
     <p v-if="state === 'validation'" class="verify-email-form__validation" role="alert">Введите все 6 цифр кода.</p>
     <p class="verify-email-form__resend">Отправить повторно через 55 с</p>
@@ -56,7 +88,7 @@ async function submitForm() {
 <style scoped lang="sass">
 .verify-email-form
   display: grid
-  width: min(100%, 340px)
+  width: min(100%, 420px)
   margin: 0 auto
   text-align: center
 
