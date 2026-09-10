@@ -22,6 +22,7 @@ public sealed class VoiceRecording
     public string Status { get; set; } = "processing";
     public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public bool IsCurrent { get; set; } = true;
     public List<TranscriptSegment> Segments { get; set; } = [];
 }
 

@@ -11,9 +11,26 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_VoiceRecordings_ProjectEntityId",
-                table: "VoiceRecordings");
+            migrationBuilder.AddColumn<bool>(
+                name: "IsCurrent",
+                table: "VoiceRecordings",
+                type: "boolean",
+                nullable: false,
+                defaultValue: true);
+
+            migrationBuilder.Sql("""
+                WITH ranked_recordings AS (
+                    SELECT "Id",
+                           ROW_NUMBER() OVER (
+                               PARTITION BY "ProjectEntityId"
+                               ORDER BY "CreatedAt" DESC, "Id" DESC) AS recording_rank
+                    FROM "VoiceRecordings"
+                )
+                UPDATE "VoiceRecordings" AS recording
+                SET "IsCurrent" = ranked_recordings.recording_rank = 1
+                FROM ranked_recordings
+                WHERE recording."Id" = ranked_recordings."Id";
+                """);
 
             migrationBuilder.AddColumn<string>(
                 name: "CleanedText",
@@ -298,10 +315,11 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_VoiceRecordings_ProjectEntityId",
+                name: "IX_VoiceRecordings_ProjectEntityId_Current",
                 table: "VoiceRecordings",
                 column: "ProjectEntityId",
-                unique: true);
+                unique: true,
+                filter: "\"IsCurrent\" = TRUE");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AnalysisRelations_SpecificationAnalysisId_ExternalId",
@@ -415,17 +433,16 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
                 name: "SpecificationAnalyses");
 
             migrationBuilder.DropIndex(
-                name: "IX_VoiceRecordings_ProjectEntityId",
+                name: "IX_VoiceRecordings_ProjectEntityId_Current",
+                table: "VoiceRecordings");
+
+            migrationBuilder.DropColumn(
+                name: "IsCurrent",
                 table: "VoiceRecordings");
 
             migrationBuilder.DropColumn(
                 name: "CleanedText",
                 table: "TranscriptSegments");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_VoiceRecordings_ProjectEntityId",
-                table: "VoiceRecordings",
-                column: "ProjectEntityId");
         }
     }
 }

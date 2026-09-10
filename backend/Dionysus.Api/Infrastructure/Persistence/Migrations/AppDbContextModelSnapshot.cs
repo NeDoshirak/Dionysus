@@ -571,6 +571,11 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsCurrent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Language")
                         .HasColumnType("text");
 
@@ -593,8 +598,11 @@ namespace Dionysus.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectEntityId")
-                        .IsUnique();
+                    b.HasIndex("ProjectEntityId");
+
+                    b.HasIndex(new[] { "ProjectEntityId" }, "IX_VoiceRecordings_ProjectEntityId_Current")
+                        .IsUnique()
+                        .HasFilter("\"IsCurrent\" = TRUE");
 
                     b.ToTable("VoiceRecordings");
                 });

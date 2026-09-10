@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -34,6 +35,92 @@ public sealed class SpecificationPersistenceTests
         });
 
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+
+        db.ChangeTracker.Clear();
+        db.SpecificationAnalyses.Add(new SpecificationAnalysis { ProjectEntityId = project.Id });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Migration_preserves_legacy_recordings_and_designates_the_newest_as_current()
+    {
+        await using var database = await PostgresDatabase.CreateEmptyAsync();
+        var projectId = Guid.NewGuid();
+        var olderId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var newerId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var createdAt = DateTimeOffset.Parse("2026-09-11T10:00:00+00:00");
+
+        await database.ExecuteAsync($"""
+            CREATE TABLE "Projects" ("Id" uuid NOT NULL PRIMARY KEY);
+            CREATE TABLE "VoiceRecordings" ("Id" uuid NOT NULL PRIMARY KEY, "ProjectEntityId" uuid NOT NULL, "CreatedAt" timestamp with time zone NOT NULL);
+            CREATE INDEX "IX_VoiceRecordings_ProjectEntityId" ON "VoiceRecordings" ("ProjectEntityId");
+            INSERT INTO "Projects" ("Id") VALUES ('{projectId}');
+            INSERT INTO "VoiceRecordings" ("Id", "ProjectEntityId", "CreatedAt") VALUES ('{olderId}', '{projectId}', '{createdAt:O}'), ('{newerId}', '{projectId}', '{createdAt:O}');
+            """);
+
+        await using var db = database.CreateContext();
+        await db.Database.MigrateAsync();
+
+        var currentIds = await database.QueryGuidsAsync("SELECT \"Id\" FROM \"VoiceRecordings\" WHERE \"IsCurrent\" ORDER BY \"Id\"");
+
+        Assert.Equal(2, await database.QueryIntAsync("SELECT COUNT(*) FROM \"VoiceRecordings\""));
+        Assert.Equal([newerId], currentIds);
+    }
+
+    [Theory]
+    [InlineData("statement-segment")]
+    [InlineData("relation-source")]
+    [InlineData("relation-target")]
+    [InlineData("function")]
+    [InlineData("item")]
+    public async Task Source_links_reject_cross_project_or_analysis_references(string linkType)
+    {
+        await using var database = await PostgresDatabase.CreateAsync();
+        await using var db = database.CreateContext();
+        await db.Database.EnsureCreatedAsync();
+        var ids = await SeedTwoAnalysisAggregatesAsync(db);
+
+        switch (linkType)
+        {
+            case "statement-segment":
+                db.AnalysisStatementSegments.Add(new AnalysisStatementSegment
+                {
+                    AnalysisStatementId = ids.FirstStatementId,
+                    TranscriptSegmentId = ids.SecondSegmentId
+                });
+                break;
+            case "relation-source":
+                db.AnalysisRelationSourceStatements.Add(new AnalysisRelationSourceStatement
+                {
+                    AnalysisRelationId = ids.FirstRelationId,
+                    AnalysisStatementId = ids.SecondStatementId
+                });
+                break;
+            case "relation-target":
+                db.AnalysisRelationTargetStatements.Add(new AnalysisRelationTargetStatement
+                {
+                    AnalysisRelationId = ids.FirstRelationId,
+                    AnalysisStatementId = ids.SecondStatementId
+                });
+                break;
+            case "function":
+                db.SpecificationFunctionStatements.Add(new SpecificationFunctionStatement
+                {
+                    SpecificationFunctionId = ids.FirstFunctionId,
+                    AnalysisStatementId = ids.SecondStatementId
+                });
+                break;
+            case "item":
+                db.SpecificationItemStatements.Add(new SpecificationItemStatement
+                {
+                    SpecificationItemId = ids.FirstItemId,
+                    AnalysisStatementId = ids.SecondStatementId
+                });
+                break;
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
     }
 
     [Fact]
@@ -148,6 +235,8 @@ public sealed class SpecificationPersistenceTests
 
         private PostgresDatabase(string connectionString) => _connectionString = connectionString;
 
+        public string ConnectionString => _connectionString;
+
         public static async Task<PostgresDatabase> CreateAsync()
         {
             var template = Environment.GetEnvironmentVariable("TEST_DATABASE_URL")
@@ -162,6 +251,48 @@ public sealed class SpecificationPersistenceTests
             return database;
         }
 
+        public static async Task<PostgresDatabase> CreateEmptyAsync()
+        {
+            var template = Environment.GetEnvironmentVariable("TEST_DATABASE_URL")
+                ?? "Host=localhost;Port=5432;Database=dionysus;Username=dionysus;Password=dionysus";
+            var builder = new NpgsqlConnectionStringBuilder(template)
+            {
+                Database = $"dionysus_task_1_{Guid.NewGuid():N}"
+            };
+            await using var connection = new NpgsqlConnection(template);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand($"CREATE DATABASE \"{builder.Database}\"", connection);
+            await command.ExecuteNonQueryAsync();
+            return new PostgresDatabase(builder.ConnectionString);
+        }
+
+        public async Task ExecuteAsync(string sql)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public async Task<Guid[]> QueryGuidsAsync(string sql)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync();
+            var ids = new List<Guid>();
+            while (await reader.ReadAsync()) ids.Add(reader.GetGuid(0));
+            return ids.ToArray();
+        }
+
+        public async Task<int> QueryIntAsync(string sql)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
+
         public AppDbContext CreateContext() => new(new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(_connectionString)
             .Options);
@@ -172,4 +303,35 @@ public sealed class SpecificationPersistenceTests
             await db.Database.EnsureDeletedAsync();
         }
     }
+
+    private static async Task<AggregateIds> SeedTwoAnalysisAggregatesAsync(AppDbContext db)
+    {
+        var firstProject = new ProjectEntity { OwnerId = "user-1", Name = "First" };
+        var secondProject = new ProjectEntity { OwnerId = "user-2", Name = "Second" };
+        var firstRecording = new VoiceRecording { ProjectEntityId = firstProject.Id, FileName = "one.wav", ContentType = "audio/wav", SourceType = "audio" };
+        var secondRecording = new VoiceRecording { ProjectEntityId = secondProject.Id, FileName = "two.wav", ContentType = "audio/wav", SourceType = "audio" };
+        var firstAnalysis = new SpecificationAnalysis { ProjectEntityId = firstProject.Id };
+        var secondAnalysis = new SpecificationAnalysis { ProjectEntityId = secondProject.Id };
+        var firstStatement = new AnalysisStatement { SpecificationAnalysisId = firstAnalysis.Id, ExternalId = "st-1", Text = "First statement" };
+        var secondStatement = new AnalysisStatement { SpecificationAnalysisId = secondAnalysis.Id, ExternalId = "st-1", Text = "Second statement" };
+        var firstRelation = new AnalysisRelation { SpecificationAnalysisId = firstAnalysis.Id, ExternalId = "rel-1" };
+        var firstFunction = new SpecificationFunction { SpecificationAnalysisId = firstAnalysis.Id, Title = "First", Description = "First function" };
+        var firstItem = new SpecificationItem { SpecificationAnalysisId = firstAnalysis.Id, SpecificationFunctionId = firstFunction.Id, Kind = SpecificationItemKind.FunctionalRequirement, Description = "First item" };
+        var firstSegment = new TranscriptSegment { VoiceRecordingId = firstRecording.Id, Text = "First segment" };
+        var secondSegment = new TranscriptSegment { VoiceRecordingId = secondRecording.Id, Text = "Second segment" };
+
+        db.AddRange(firstProject, secondProject, firstRecording, secondRecording, firstAnalysis, secondAnalysis,
+            firstStatement, secondStatement, firstRelation, firstFunction, firstItem, firstSegment, secondSegment);
+        await db.SaveChangesAsync();
+
+        return new AggregateIds(firstStatement.Id, secondStatement.Id, firstRelation.Id, firstFunction.Id, firstItem.Id, secondSegment.Id);
+    }
+
+    private sealed record AggregateIds(
+        Guid FirstStatementId,
+        Guid SecondStatementId,
+        Guid FirstRelationId,
+        Guid FirstFunctionId,
+        Guid FirstItemId,
+        Guid SecondSegmentId);
 }
