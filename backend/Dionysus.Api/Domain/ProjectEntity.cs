@@ -5,6 +5,7 @@ public sealed class ProjectEntity
     public string Name { get; set; } = null!;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public List<VoiceRecording> Recordings { get; set; } = [];
+    public SpecificationAnalysis? SpecificationAnalysis { get; set; }
 }
 
 public sealed class VoiceRecording
@@ -31,4 +32,5 @@ public sealed class TranscriptSegment
     public double StartSeconds { get; set; }
     public double EndSeconds { get; set; }
     public string Text { get; set; } = string.Empty;
+    public string? CleanedText { get; set; }
 }
