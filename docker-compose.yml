@@ -25,11 +25,29 @@ services:
     volumes:
       - whisper_cache:/root/.cache
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - valkey_data:/data
+
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-dionysus}:${POSTGRES_PASSWORD:-dionysus}@db:5432/${POSTGRES_DB:-dionysus}
+      DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB:-dionysus};Username=${POSTGRES_USER:-dionysus};Password=${POSTGRES_PASSWORD:-dionysus}
+      VALKEY_CONNECTION: valkey:6379
+      JWT_KEY: ${JWT_KEY}
+      AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
       WHISPER_URL: http://whisper:9000
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
     ports:
       - "8000:8000"
     depends_on:
@@ -37,6 +55,8 @@ services:
         condition: service_healthy
       whisper:
         condition: service_started
+      valkey:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -48,3 +68,4 @@ services:
 volumes:
   postgres_data:
   whisper_cache:
+  valkey_data:

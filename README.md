@@ -21,4 +21,14 @@ docker compose up --build
 
 CI запускается на push и pull request. Для deploy нужны secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`; сервер должен иметь Docker Compose и checkout этого репозитория.
 
+## Авторизация API
+
+Перед запуском задайте `JWT_KEY` и `AUTH_CODE_PEPPER` в `.env` случайными секретами, а также SMTP-переменные. API использует PostgreSQL для пользователей и Valkey для кодов и refresh-сессий.
+
+- `POST /api/auth/register` — регистрация и письмо с кодом;
+- `POST /api/auth/verify-email` — подтверждение кода и выдача токена;
+- `POST /api/auth/login`, `/refresh`, `/logout`;
+- `POST /api/auth/password-reset/request` и `/confirm`;
+- `GET /api/auth/me` с `Authorization: Bearer <access-token>`.
+
 Первый запуск Whisper может скачать модель и занять несколько минут. Размер модели настраивается через `WHISPER_MODEL` (`tiny`, `base`, `small`, `medium`, `large`).
