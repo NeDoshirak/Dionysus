@@ -70,6 +70,8 @@ Replace only the local adapters with an HTTP client and endpoint implementations
 
 No UI flow may require data absent from the backend contract. Before an endpoint is implemented, re-check its controller and DTO definitions; backend can change independently.
 
+No profile read/update endpoint is confirmed. The profile screen remains a local, non-persistent interface in Stage 2 rather than issuing guessed requests; the sign-out control is integrated because its contract exists.
+
 ## Confirmed backend contract
 
 | Area | Contract used by frontend |
