@@ -39,6 +39,8 @@ ScaffoldingReadMe.txt
 # dotenv environment variables file
 .env
 .idea/
+**/node_modules/
+frontend/dist/
 
 # Others
 ~$*
