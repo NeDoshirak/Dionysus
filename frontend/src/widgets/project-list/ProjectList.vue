@@ -13,7 +13,13 @@ defineProps({
   <div class="project-list" aria-live="polite">
     <p v-if="loading" class="project-list__state">Загрузка проектов…</p>
     <p v-else-if="error" class="project-list__state project-list__state--error" role="alert">{{ error }}</p>
-    <p v-else-if="!projects.length" class="project-list__state">Проектов пока нет</p>
+    <div v-else-if="!projects.length" class="project-list__empty">
+      <span class="project-list__file" aria-hidden="true">▣</span>
+      <span class="project-list__details">
+        <strong>Проектов пока нет</strong>
+        <small>Создайте проект, чтобы начать</small>
+      </span>
+    </div>
     <div v-else class="project-list__rows">
       <RouterLink v-for="project in projects" :key="project.id" class="project-list__row" :to="{ name: 'specification', params: { id: project.id } }">
         <span class="project-list__file" aria-hidden="true">▣</span>
@@ -33,6 +39,16 @@ defineProps({
   &__rows
     display: grid
 
+  &__empty
+    display: grid
+    justify-items: center
+    gap: 12px
+    padding: 64px 24px
+    text-align: center
+
+    .project-list__details
+      justify-items: center
+
   &__row
     display: flex
     align-items: center
@@ -49,10 +65,10 @@ defineProps({
 
   &__file
     display: grid
-    width: 38px
-    height: 38px
+    width: 52px
+    height: 52px
     place-items: center
-    border-radius: 9px
+    border-radius: 12px
     background: var(--color-accent-soft)
     color: var(--color-accent)
 

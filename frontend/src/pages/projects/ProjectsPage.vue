@@ -76,15 +76,15 @@ onMounted(loadProjects)
   background: var(--color-background)
 
   &__main
-    max-width: 960px
+    width: min(calc(100% - 48px), 845px)
     margin: 0 auto
-    padding: 36px 32px
+    padding: 36px 0
 
   &__heading
     display: flex
     align-items: center
     justify-content: space-between
-    gap: 16px
+    gap: 12px
 
   &__actions
     display: flex
@@ -107,7 +107,8 @@ onMounted(loadProjects)
 @media (max-width: 680px)
   .projects-page
     &__main
-      padding: 24px 16px
+      width: calc(100% - 32px)
+      padding: 24px 0
 
     &__heading
       align-items: stretch

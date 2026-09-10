@@ -8,6 +8,14 @@ it('shows loading state while projects are loading', () => {
   expect(wrapper.text()).toContain('Загрузка проектов')
 })
 
+it('renders the empty state with a file tile and subtitle', () => {
+  const wrapper = mount(ProjectList, { props: { projects: [], loading: false } })
+
+  expect(wrapper.get('.project-list__empty .project-list__file').exists()).toBe(true)
+  expect(wrapper.get('.project-list__empty strong').text()).toBe('Проектов пока нет')
+  expect(wrapper.get('.project-list__empty small').text()).toBe('Создайте проект, чтобы начать')
+})
+
 it('navigates from a project row to its specification', async () => {
   const router = createRouter({
     history: createMemoryHistory(),
