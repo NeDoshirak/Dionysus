@@ -53,6 +53,36 @@ public sealed class SpecificationContractValidatorTests
     }
 
     [Fact]
+    public void Stage1_rejects_duplicate_recording_segment_ids_before_building_the_known_set()
+    {
+        var exception = Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage1([
+            TranscriptSegment(SegmentOne),
+            TranscriptSegment(SegmentOne)
+        ], ValidStage1()));
+
+        Assert.Equal("input-segment-ids", exception.Rule);
+    }
+
+    [Fact]
+    public void Stage1_rejects_duplicate_statement_ids_with_safe_contract_diagnostics()
+    {
+        var output = ValidStage1() with
+        {
+            Topics = [new Stage1TopicDto("topic-1", "Authentication", [
+                new Stage1StatementDto("st-1", "First fact.", [SegmentOne]),
+                new Stage1StatementDto("st-1", "Second fact.", [SegmentOne])
+            ])]
+        };
+
+        var exception = Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage1([TranscriptSegment(SegmentOne)], output));
+
+        Assert.Equal("stage1", exception.Stage);
+        Assert.Equal("statement-ids", exception.Rule);
+        Assert.DoesNotContain("First fact.", exception.Message);
+        Assert.DoesNotContain("Second fact.", exception.Message);
+    }
+
+    [Fact]
     public void Stage2_rejects_changed_statement_text()
     {
         var output = ValidStage2() with
@@ -61,6 +91,19 @@ public sealed class SpecificationContractValidatorTests
         };
 
         Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage2(ValidStage1(), output));
+    }
+
+    [Fact]
+    public void Stage2_rejects_duplicate_input_statement_ids_before_building_the_dictionary()
+    {
+        var input = new Stage1ExtractionResponse("1.0", [], [
+            new Stage1TopicDto("topic-1", "Authentication", [new Stage1StatementDto("st-1", "First fact.", [SegmentOne])]),
+            new Stage1TopicDto("topic-2", "Authorization", [new Stage1StatementDto("st-1", "Second fact.", [SegmentOne])])
+        ]);
+
+        var exception = Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage2(input, ValidStage2()));
+
+        Assert.Equal("input-statement-ids", exception.Rule);
     }
 
     [Fact]
@@ -126,6 +169,19 @@ public sealed class SpecificationContractValidatorTests
         };
 
         Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage3(input, output));
+    }
+
+    [Fact]
+    public void Stage3_rejects_duplicate_input_statement_ids_before_building_the_known_set()
+    {
+        var input = new Stage3FunctionRequest("1.0", [], new Stage3FunctionInputDto("topic-1", "Authentication", [
+            new Stage2StatementDto("st-1", "First fact.", AnalysisStatementStatus.Active, [SegmentOne]),
+            new Stage2StatementDto("st-1", "Second fact.", AnalysisStatementStatus.Active, [SegmentOne])
+        ], []));
+
+        var exception = Assert.Throws<SpecificationContractException>(() => _validator.ValidateStage3(input, ValidStage3()));
+
+        Assert.Equal("input-statement-ids", exception.Rule);
     }
 
     private static StageSegmentDto Segment(Guid id) => new(id, 0, 1, "Transcript text stays out of diagnostics.");

@@ -56,8 +56,9 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
     {
         const string stage = "stage1";
         RequireVersion(output.SchemaVersion, stage);
-        var knownSegmentIds = segments.Select(x => x.Id).ToHashSet();
-        RequireNonEmptyUniqueGuids(knownSegmentIds, stage, "input-segment-ids");
+        var inputSegmentIds = segments.Select(x => x.Id).ToArray();
+        RequireNonEmptyUniqueGuids(inputSegmentIds, stage, "input-segment-ids");
+        var knownSegmentIds = inputSegmentIds.ToHashSet();
         ValidateBusinessContext(output.BusinessContext, knownSegmentIds, stage);
         RequireUniqueMatchingIds(output.Topics.Select(x => x.Id), TopicId, stage, "topic-ids");
 
@@ -80,8 +81,9 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
         const string stage = "stage2";
         RequireVersion(input.SchemaVersion, stage);
         RequireVersion(output.SchemaVersion, stage);
-        var inputStatements = input.Topics.SelectMany(x => x.Statements).ToDictionary(x => x.Id, StringComparer.Ordinal);
-        RequireUniqueMatchingIds(inputStatements.Keys, StatementId, stage, "input-statement-ids");
+        var inputStatementList = input.Topics.SelectMany(x => x.Statements).ToArray();
+        RequireUniqueMatchingIds(inputStatementList.Select(x => x.Id), StatementId, stage, "input-statement-ids");
+        var inputStatements = inputStatementList.ToDictionary(x => x.Id, StringComparer.Ordinal);
         ValidateImmutableBusinessContext(input.BusinessContext, output.BusinessContext, stage);
 
         RequireUniqueMatchingIds(output.Statements.Select(x => x.Id), StatementId, stage, "statement-ids");
@@ -138,8 +140,9 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
         const string stage = "stage3";
         RequireVersion(input.SchemaVersion, stage);
         RequireVersion(output.SchemaVersion, stage);
-        var functionStatementIds = input.Function.Statements.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
-        RequireUniqueMatchingIds(functionStatementIds, StatementId, stage, "input-statement-ids");
+        var inputStatementIds = input.Function.Statements.Select(x => x.Id).ToArray();
+        RequireUniqueMatchingIds(inputStatementIds, StatementId, stage, "input-statement-ids");
+        var functionStatementIds = inputStatementIds.ToHashSet(StringComparer.Ordinal);
 
         ValidateSourceLinkedItem(output.Function.SourceStatementIds, functionStatementIds, stage, "function-sources");
         RequireText(output.Function.Title, stage, "function-title");
