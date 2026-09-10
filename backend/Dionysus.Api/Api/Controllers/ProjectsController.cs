@@ -38,6 +38,7 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
                 EndSeconds = segment.EndSeconds,
                 Text = segment.Text
             }).ToList();
+            db.TranscriptSegments.AddRange(recording.Segments);
             recording.Status = "completed";
             await db.SaveChangesAsync(ct);
             return CreatedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
