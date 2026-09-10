@@ -26,6 +26,11 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IMediaConverter, FfmpegMediaConverter>();
 builder.Services.AddScoped<ITranscriptionService, WhisperTranscriptionService>();
 builder.Services.AddScoped<ITextGenerationService, YandexAiService>();
+builder.Services.AddScoped<ISpecificationContractValidator, SpecificationContractValidator>();
+builder.Services.AddScoped<ISpecificationPromptFactory, SpecificationPromptFactory>();
+builder.Services.AddScoped<IStructuredSpecificationAiService, StructuredYandexAiService>();
+builder.Services.AddSingleton<ISpecificationAnalysisQueue, SpecificationAnalysisQueue>();
+builder.Services.AddHostedService<SpecificationAnalysisWorker>();
 builder.Services.AddHttpClient("whisper", client => { client.BaseAddress = new Uri(builder.Configuration["WHISPER_URL"] ?? "http://localhost:9000"); client.Timeout = TimeSpan.FromMinutes(5); });
 builder.Services.AddHttpClient("yandex-ai", client => { client.BaseAddress = new Uri("https://ai.api.cloud.yandex.net/"); client.Timeout = TimeSpan.FromMinutes(2); });
 var tokenService = new TokenService(
