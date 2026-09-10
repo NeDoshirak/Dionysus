@@ -96,3 +96,25 @@ export async function verifyEmailLocal() {
     expiresAt: '2026-09-11T12:00:00.000Z',
   }
 }
+
+export async function signInLocal({ email, password }) {
+  if (!email?.trim() || !password) throw { code: 'validation' }
+  if (email.trim().toLowerCase() === 'unconfirmed@dionysus.app') throw { code: 'unconfirmed-email' }
+  if (email.trim().toLowerCase() !== 'demo@dionysus.app' || password !== 'Demo1234') throw { code: 'invalid-credentials' }
+
+  return {
+    accessToken: 'local-access-token',
+    expiresAt: '2026-09-11T12:00:00.000Z',
+  }
+}
+
+export async function requestPasswordResetLocal({ email }) {
+  if (!email?.trim() || !email.includes('@')) throw { code: 'validation' }
+  if (email.trim().toLowerCase() === 'server-error@dionysus.app') throw { code: 'server-error' }
+  return { email: email.trim() }
+}
+
+export async function confirmPasswordResetLocal({ email, code, password }) {
+  if (!email?.trim() || code !== '123456' || !password) throw { code: 'server-error' }
+  return { email: email.trim() }
+}

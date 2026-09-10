@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { SignUpForm } from '@/features/sign-up'
+import { SignInForm } from '@/features/sign-in'
+import { ResetPasswordForm } from '@/features/reset-password'
 import { VerifyEmailForm } from '@/features/verify-email'
 import { BaseButton } from '@/shared/ui'
 import { AuthLayout } from '@/widgets/auth-layout'
@@ -13,7 +15,9 @@ const email = computed(() => route.query.email || '')
 <template>
   <AuthLayout>
     <SignUpForm v-if="route.name === 'sign-up'" />
+    <SignInForm v-else-if="route.name === 'sign-in'" />
     <VerifyEmailForm v-else-if="route.name === 'verify-email'" :email="email" />
+    <ResetPasswordForm v-else-if="route.name === 'reset-password'" :email="email" :step="route.query.step" />
     <section v-else class="auth-page__success" aria-labelledby="confirmation-title">
       <p class="auth-page__brand">SpecScribe</p>
       <div class="auth-page__success-mark" aria-hidden="true">✓</div>
