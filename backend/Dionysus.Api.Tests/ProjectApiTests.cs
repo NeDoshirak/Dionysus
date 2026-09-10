@@ -144,6 +144,32 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         Assert.Empty(queue.Jobs);
     }
 
+    [Fact]
+    public async Task Get_project_includes_specification_analysis_status()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+        var project = new ProjectEntity { OwnerId = "user-1", Name = "Project" };
+        project.SpecificationAnalysis = new SpecificationAnalysis
+        {
+            ProjectEntityId = project.Id,
+            Status = SpecificationAnalysisStatus.Completed
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+        await using var readDb = new AppDbContext(options);
+
+        var controller = CreateController(readDb, null!, null!);
+
+        var result = await controller.Get(project.Id);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var details = Assert.IsType<ProjectDetailsDto>(ok.Value);
+        Assert.Equal(SpecificationAnalysisStatus.Completed.ToString(), details.SpecificationStatus);
+    }
+
     private static ProjectsController CreateController(AppDbContext db, ITranscriptionService transcription, ISpecificationAnalysisQueue queue) =>
         new(db, null!, transcription, queue)
         {

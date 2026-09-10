@@ -147,6 +147,7 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             .Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
             .Include(x => x.Recordings)
             .ThenInclude(x => x.Segments)
+            .Include(x => x.SpecificationAnalysis)
             .FirstOrDefaultAsync();
         return project is null ? NotFound() : Ok(ToDetails(project));
     }
