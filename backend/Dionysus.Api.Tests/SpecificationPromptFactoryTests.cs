@@ -1,0 +1,39 @@
+using Xunit;
+
+public sealed class SpecificationPromptFactoryTests
+{
+    private readonly SpecificationPromptFactory _factory = new();
+
+    [Fact]
+    public void Stage0_instructions_preserve_segments_and_require_strict_json()
+    {
+        var instructions = _factory.Stage0Instructions();
+
+        Assert.Contains("transcript editor", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("schemaVersion\": \"1.0\"", instructions);
+        Assert.Contains("one JSON object only", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("no Markdown", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("count, order, and IDs", instructions, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Stage2_instructions_forbid_new_facts()
+    {
+        var instructions = _factory.Stage2Instructions();
+
+        Assert.Contains("strict reviewer", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Do not invent facts", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("one JSON object only", instructions, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Stage3_instructions_limit_synthesis_to_sources_and_require_key_questions()
+    {
+        var instructions = _factory.Stage3Instructions();
+
+        Assert.Contains("system analyst", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("source statements", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("keyQuestions", instructions);
+        Assert.Contains("one JSON object only", instructions, System.StringComparison.OrdinalIgnoreCase);
+    }
+}
