@@ -38,7 +38,7 @@ onBeforeUnmount(() => {
 <template>
   <dialog
     ref="dialog"
-    class="base-dialog"
+    class="base-dialog base-dialog--fade-in"
     :aria-labelledby="titleId"
     @cancel.prevent="$emit('close')"
   >
@@ -61,9 +61,11 @@ onBeforeUnmount(() => {
   color: var(--color-text)
   box-shadow: 0 24px 80px rgb(17 24 39 / 20%)
   overflow: auto
+  animation: base-dialog-fade-in 180ms ease-out
 
   &::backdrop
     background: rgb(17 24 39 / 55%)
+    animation: base-dialog-backdrop-fade-in 180ms ease-out
 
   &__header
     display: flex
@@ -100,4 +102,22 @@ onBeforeUnmount(() => {
 @media (max-width: 480px)
   .base-dialog
     padding: var(--space-5)
+
+@media (prefers-reduced-motion: reduce)
+  .base-dialog, .base-dialog::backdrop
+    animation: none
+
+@keyframes base-dialog-fade-in
+  from
+    opacity: 0
+
+  to
+    opacity: 1
+
+@keyframes base-dialog-backdrop-fade-in
+  from
+    background: transparent
+
+  to
+    background: rgb(17 24 39 / 55%)
 </style>

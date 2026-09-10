@@ -70,3 +70,9 @@ it('labels the dialog and requests closure through Escape and its close button',
   await wrapper.get('button[aria-label="Закрыть"]').trigger('click')
   expect(wrapper.emitted('close')).toHaveLength(2)
 })
+
+it('marks the dialog for the opening fade animation', () => {
+  const wrapper = mount(BaseDialog, { props: { title: 'Новый проект' } })
+
+  expect(wrapper.get('dialog').classes()).toContain('base-dialog--fade-in')
+})
