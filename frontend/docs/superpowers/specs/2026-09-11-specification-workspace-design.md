@@ -19,6 +19,8 @@ The backend owns the completed analysis, functions, item order, source statement
 
 Out of scope: export, confidence scoring, manual statement-status changes, manual timeline editing, user-story generation beyond the `UserScenario` item kind, drag-and-drop ordering, multiple-recording source selection, and any invented persistence endpoint.
 
+The backend is entirely out of scope: this work must not modify its source code, configuration, migrations, deployment, or data. It is treated exclusively as an immutable API contract consumed by the frontend.
+
 ## Backend contract
 
 All specification and project requests are authenticated and use the application's Bearer access-token and refresh-cookie flow.
