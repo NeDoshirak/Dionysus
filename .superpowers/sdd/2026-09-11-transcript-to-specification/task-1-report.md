@@ -88,3 +88,75 @@ Result: passed 23/23, failed 0.
 ## Commit
 
 Implementation commit SHA: `08b21ac` (`feat: add persistent specification analysis model`).
+
+---
+
+# Review Fix Report, Round 1
+
+## Findings addressed
+
+1. **Legacy recordings and current-recording invariant**
+   - Added `VoiceRecording.IsCurrent`, defaulting to `true` for newly created recordings.
+   - Preserved the existing non-unique `IX_VoiceRecordings_ProjectEntityId` index.
+   - Replaced the unsafe full unique index with the PostgreSQL partial unique index `IX_VoiceRecordings_ProjectEntityId_Current`, restricted to rows where `"IsCurrent" = TRUE`.
+   - The regenerated migration adds the marker, then deterministically ranks legacy recordings by `CreatedAt DESC, Id DESC` and marks exactly one per project as current. No audio or recording rows are deleted or overwritten.
+
+2. **Aggregate provenance boundaries**
+   - Added `AppDbContext.SaveChanges` / `SaveChangesAsync` validation for added and modified provenance links.
+   - `AnalysisStatementSegment` requires the statement analysis project to match the segment recording project.
+   - Source and target relation links, function links, and item links require both endpoints to belong to the same specification analysis. The validation resolves both tracked new entities and persisted entities before SQL persistence.
+   - Invalid provenance throws `InvalidOperationException` before EF submits the link.
+
+3. **Missing second-analysis uniqueness test**
+   - Extended the cardinality test to insert a second `SpecificationAnalysis` after clearing the failed second-recording change; PostgreSQL raises `DbUpdateException` for the unique analysis index.
+
+## TDD evidence
+
+### RED
+
+Added the migration-backfill test and five real cross-boundary provenance-link variants before changing the implementation, then ran:
+
+```powershell
+docker run --rm --network <project-network> -e TEST_DATABASE_URL=<isolated-connection> -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test backend/Dionysus.Api.Tests/Dionysus.Api.Tests.csproj --filter FullyQualifiedName~SpecificationPersistenceTests
+```
+
+Result: 6 failed, 2 passed.
+
+- The legacy migration test failed with PostgreSQL `23505` while creating the full unique recording index.
+- Each of the five cross-project/cross-analysis link tests failed because no exception was thrown.
+
+### GREEN
+
+Reran the same focused command after implementation.
+
+Result: passed 8/8.
+
+The migration test seeds two legacy recordings with identical `CreatedAt` values and verifies both rows remain while the higher stable `Id` is selected as the sole current recording.
+
+## Verification
+
+Full backend suite:
+
+```powershell
+docker run --rm --network <project-network> -e TEST_DATABASE_URL=<isolated-connection> -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test backend/Dionysus.Api.Tests/Dionysus.Api.Tests.csproj
+```
+
+Result: passed 29/29, failed 0.
+
+EF model synchronization:
+
+```powershell
+dotnet ef migrations has-pending-model-changes --project backend\Dionysus.Api\Dionysus.Api.csproj --startup-project backend\Dionysus.Api\Dionysus.Api.csproj
+```
+
+Result: `No changes have been made to the model since the last migration.`
+
+## Self-review
+
+- Verified the legacy index remains in the generated migration and the filtered index is additional, not a replacement.
+- Verified the migration backfill runs before creation of the filtered unique index.
+- Verified every requested provenance link type is tested and validated before persistence.
+- Verified the public API surface was not changed.
+- Ran `git diff --check` before committing.
+
+Review-fix implementation commit SHA: `458d29d` (`fix: preserve recording history and provenance boundaries`).
