@@ -1,5 +1,10 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { getSession } from '@/entities/session'
+
+const email = getSession()?.email || ''
+const avatarInitial = computed(() => email.charAt(0).toUpperCase() || '—')
 </script>
 
 <template>
@@ -7,8 +12,8 @@ import { RouterLink } from 'vue-router'
     <div class="app-header__inner">
       <RouterLink class="app-header__brand" to="/projects">SpecScribe</RouterLink>
       <RouterLink class="app-header__profile" to="/profile">
-        <span class="app-header__avatar">АИ</span>
-        <span>Александр И.</span>
+        <span class="app-header__avatar">{{ avatarInitial }}</span>
+        <span>{{ email }}</span>
         <span aria-hidden="true">⌄</span>
       </RouterLink>
     </div>
