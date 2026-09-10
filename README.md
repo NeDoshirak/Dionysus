@@ -18,6 +18,20 @@ docker compose up --build
 `multipart/form-data` с полями `name` и `media`. Поддерживаются аудио и видео;
 для видео сохраняется только извлечённая аудиодорожка.
 
+После успешной транскрипции API автоматически создаёт один анализ спецификации
+и ставит его в фоновую очередь. Анализ проходит статусы `Queued`,
+`RunningStage0`, `RunningStage1`, `RunningStage2`, `RunningStage3`, а затем
+`Completed` или `Failed`. `GET /api/projects/{projectId}/specification`
+возвращает текущий статус, ошибку (если есть), даты запуска/завершения,
+бизнес-контекст, функции и элементы спецификации.
+
+Обработка выполняется последовательно по этапам. Этап 3 запускает не более
+четырёх запросов к AI одновременно; порядок опубликованных функций остаётся
+стабильным. Сбой сохраняет статус `Failed` и описание этапа. Повторный запуск
+разрешён только для `Failed`: `POST /api/projects/{projectId}/specification/retry`
+создаёт новый `runId`, увеличивает `retryCount`, очищает неполные результаты и
+возвращает анализ в `Queued`. Завершённый анализ повторно запустить нельзя.
+
 В ответе `GET /api/projects/{id}` транскрипция содержит сегменты для таймлайна:
 
 ```json
@@ -34,7 +48,11 @@ docker compose up --build
 
 ## CI/CD
 
-CI запускается на push и pull request. Для deploy нужны secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`; сервер должен иметь Docker Compose и checkout этого репозитория.
+CI запускается на push и pull request: проверяет Docker, полный backend test
+project (с PostgreSQL для persistence-тестов), backend/frontend build,
+`docker build ./backend` и `docker compose config`. Для deploy нужны secrets
+`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`; сервер должен
+иметь Docker Compose и checkout этого репозитория.
 
 ## Авторизация API
 
@@ -59,6 +77,28 @@ Refresh-токен хранится в `HttpOnly` cookie с `SameSite=Strict` и
 
 Обе ручки возвращают score релевантности и требуют access token. Поиск учитывает
 опечатки и похожие слова, а результаты сортируются от наиболее подходящих.
+
+## Спецификация и происхождение данных
+
+Все ручки спецификации требуют access token и ограничены владельцем проекта:
+
+- `GET /api/projects/{projectId}/specification` — статус, ошибка, функции,
+  элементы и бизнес-контекст анализа;
+- `POST /api/projects/{projectId}/specification/retry` — повторить только
+  неуспешный анализ;
+- `GET /api/projects/{projectId}/specification/functions/{functionId}` —
+  получить функцию;
+- `POST/PATCH/DELETE /api/projects/{projectId}/specification/functions` и
+  `/functions/{functionId}` — редактировать функции завершённого анализа;
+- `POST/PATCH/DELETE /api/projects/{projectId}/specification/functions/{functionId}/items`
+  и `/items/{itemId}` — редактировать элементы завершённого анализа.
+
+Ответы содержат ссылки на исходные statements и transcript segments. Для
+каждого сегмента возвращаются сохранённые `startSeconds`, `endSeconds` и текст,
+поэтому UI может показать точное место в записи. AI-элементы сохраняют
+происхождение, а созданные вручную элементы помечаются `isManual=true`.
+Публикация результата атомарна: частичные функции и элементы не выдаются как
+завершённая спецификация.
 
 ## Yandex AI Studio
 

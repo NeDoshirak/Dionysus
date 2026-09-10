@@ -3,14 +3,34 @@ on: [push, pull_request]
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: Host=localhost;Port=5432;Database=postgres;Username=dionysus;Password=dionysus
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
+      - run: docker info
+      - name: Start PostgreSQL for persistence tests
+        run: |
+          docker run --detach --name dionysus-ci-db \
+            --publish 5432:5432 \
+            --env POSTGRES_USER=dionysus \
+            --env POSTGRES_PASSWORD=dionysus \
+            --env POSTGRES_DB=postgres \
+            postgres:16-alpine
+          for i in {1..30}; do
+            docker exec dionysus-ci-db pg_isready -U dionysus -d postgres && exit 0
+            sleep 1
+          done
+          exit 1
       - run: dotnet test backend/Dionysus.Api.Tests/Dionysus.Api.Tests.csproj
       - run: dotnet build backend/Dionysus.Api/Dionysus.Api.csproj --no-restore
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package.json }
-      - run: npm install && npm run build
+      - run: npm ci && npm run build
         working-directory: frontend
-      - run: docker compose config
+      - run: docker build -t dionysus-backend-spec ./backend
+      - run: cp .env.example .env && docker compose config
+      - name: Remove PostgreSQL test container
+        if: always()
+        run: docker rm --force dionysus-ci-db
