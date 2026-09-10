@@ -1,15 +1,20 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { AppHeader } from '@/widgets/app-header'
 import { ProjectList } from '@/widgets/project-list'
 import { ProjectSearch } from '@/features/search-projects'
+import { CreateProjectDialog } from '@/features/create-project'
 import { getProjects } from '@/entities/project'
+import { BaseButton } from '@/shared/ui'
 
+const router = useRouter()
 const projects = ref([])
 const baseProjects = ref([])
 const loading = ref(true)
 const error = ref('')
 const showingSearchResults = ref(false)
+const createDialogOpen = ref(false)
 
 async function loadProjects() {
   loading.value = true
@@ -30,6 +35,20 @@ function updateResults(results) {
   projects.value = results.length ? results : baseProjects.value
 }
 
+function handleCreated(project) {
+  const summary = {
+    id: project.id,
+    name: project.name,
+    createdAt: project.createdAt,
+    status: project.status,
+  }
+  baseProjects.value = [summary, ...baseProjects.value.filter((item) => item.id !== summary.id)]
+  projects.value = baseProjects.value
+  showingSearchResults.value = false
+  createDialogOpen.value = false
+  router.push({ name: 'specification', params: { id: summary.id } })
+}
+
 onMounted(loadProjects)
 </script>
 
@@ -39,11 +58,15 @@ onMounted(loadProjects)
     <main class="projects-page__main">
       <div class="projects-page__heading">
         <h1>Мои проекты</h1>
-        <ProjectSearch @results="updateResults" />
+        <div class="projects-page__actions">
+          <ProjectSearch @results="updateResults" />
+          <BaseButton @click="createDialogOpen = true">Новый проект</BaseButton>
+        </div>
       </div>
       <p class="projects-page__eyebrow">{{ showingSearchResults ? 'Результаты поиска' : 'Недавние проекты' }}</p>
       <ProjectList :projects="projects" :loading="loading" :error="error" />
     </main>
+    <CreateProjectDialog :open="createDialogOpen" @created="handleCreated" @close="createDialogOpen = false" />
   </div>
 </template>
 
@@ -62,6 +85,11 @@ onMounted(loadProjects)
     align-items: center
     justify-content: space-between
     gap: 16px
+
+  &__actions
+    display: flex
+    align-items: center
+    gap: 12px
 
   h1
     margin: 0
@@ -84,4 +112,11 @@ onMounted(loadProjects)
     &__heading
       align-items: stretch
       flex-direction: column
+
+    &__actions
+      align-items: stretch
+      flex-direction: column
+
+      :deep(.project-search)
+        width: 100%
 </style>

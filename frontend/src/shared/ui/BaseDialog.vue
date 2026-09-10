@@ -9,17 +9,29 @@ defineEmits(['close'])
 const dialog = ref(null)
 const titleId = useId()
 
+function showDialog() {
+  if (!dialog.value) return
+  if (typeof dialog.value.showModal === 'function') dialog.value.showModal()
+  else dialog.value.setAttribute('open', '')
+}
+
+function closeDialog() {
+  if (!dialog.value) return
+  if (typeof dialog.value.close === 'function') dialog.value.close()
+  else dialog.value.removeAttribute('open')
+}
+
 watch(() => props.open, (open) => {
-  if (open && !dialog.value.open) dialog.value.showModal()
-  else if (!open && dialog.value.open) dialog.value.close()
+  if (open && !dialog.value?.open) showDialog()
+  else if (!open && dialog.value?.open) closeDialog()
 }, { flush: 'post' })
 
 watch(dialog, (element) => {
-  if (element && props.open) element.showModal()
+  if (element && props.open) showDialog()
 })
 
 onBeforeUnmount(() => {
-  if (dialog.value?.open) dialog.value.close()
+  if (dialog.value?.open) closeDialog()
 })
 </script>
 
