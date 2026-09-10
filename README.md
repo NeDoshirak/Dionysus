@@ -11,7 +11,7 @@ docker compose up --build
 ```
 
 - Frontend: http://localhost:3000
-- API: http://localhost:8000/docs
+- API: http://localhost:8000/swagger/index.html
 - API health: http://localhost:8000/health
 - Whisper: http://localhost:9000
 
@@ -30,5 +30,28 @@ CI запускается на push и pull request. Для deploy нужны se
 - `POST /api/auth/login`, `/refresh`, `/logout`;
 - `POST /api/auth/password-reset/request` и `/confirm`;
 - `GET /api/auth/me` с `Authorization: Bearer <access-token>`.
+
+Refresh-токен хранится в `HttpOnly` cookie с `SameSite=Strict` и путём `/api/auth/refresh`.
+В Production cookie имеет флаг `Secure`; в Development флаг отключён, чтобы Swagger на
+`http://localhost` мог выполнять refresh. Сброс пароля отзывает все активные refresh-сессии.
+
+Пример запроса refresh:
+
+```bash
+curl -i -X POST http://localhost:8000/api/auth/refresh \
+  -b cookies.txt -c cookies.txt
+```
+
+Пример запроса сброса пароля:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/password-reset/request \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+
+curl -X POST http://localhost:8000/api/auth/password-reset/confirm \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","code":"123456","newPassword":"NewPass123!"}'
+```
 
 Первый запуск Whisper может скачать модель и занять несколько минут. Размер модели настраивается через `WHISPER_MODEL` (`tiny`, `base`, `small`, `medium`, `large`).

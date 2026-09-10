@@ -9,9 +9,12 @@ using Microsoft.EntityFrameworkCore;
 public sealed class ProjectsController(AppDbContext db, IMediaConverter media, ITranscriptionService transcription) : ControllerBase
 {
     [HttpPost]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(104857600)]
-    public async Task<IActionResult> Create([FromForm] string name, [FromForm] IFormFile mediaFile, CancellationToken ct)
+    public async Task<IActionResult> Create([FromForm] CreateProjectRequest request, CancellationToken ct)
     {
+        var name = request.Name;
+        var mediaFile = request.Media;
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200 || mediaFile.Length is 0 or > 104857600) return BadRequest();
         var type = mediaFile.ContentType.ToLowerInvariant();
         if (!type.StartsWith("audio/") && !type.StartsWith("video/")) return BadRequest(new { detail = "Only audio or video is supported" });
@@ -30,4 +33,10 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
     public Task<List<ProjectEntity>> List() => db.Projects.Where(x => x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier)).Include(x => x.Recordings).ToListAsync();
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id) { var project = await db.Projects.Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier)).Include(x => x.Recordings).FirstOrDefaultAsync(); return project is null ? NotFound() : Ok(project); }
+}
+
+public sealed class CreateProjectRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public IFormFile Media { get; init; } = null!;
 }

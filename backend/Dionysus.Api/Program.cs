@@ -16,7 +16,7 @@ builder.Services.AddIdentityCore<AppUser>(options =>
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
     options.Password.RequireUppercase = true;
-}).AddEntityFrameworkStores<AppDbContext>();
+}).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
 if (builder.Configuration["VALKEY_CONNECTION"] is null) builder.Services.AddDistributedMemoryCache();
 else builder.Services.AddStackExchangeRedisCache(options => options.Configuration = builder.Configuration["VALKEY_CONNECTION"]);
 builder.Services.AddScoped<CodeService>();
@@ -25,7 +25,11 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IMediaConverter, FfmpegMediaConverter>();
 builder.Services.AddScoped<ITranscriptionService, WhisperTranscriptionService>();
 builder.Services.AddHttpClient("whisper", client => { client.BaseAddress = new Uri(builder.Configuration["WHISPER_URL"] ?? "http://localhost:9000"); client.Timeout = TimeSpan.FromMinutes(5); });
-var tokenService = new TokenService(builder.Configuration, new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(Microsoft.Extensions.Options.Options.Create(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions())));
+var tokenService = new TokenService(
+    builder.Configuration,
+    new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(
+        Microsoft.Extensions.Options.Options.Create(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions())),
+    builder.Environment);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => options.TokenValidationParameters = tokenService.Parameters());
 builder.Services.AddAuthorization();
 builder.Services.AddProblemDetails();

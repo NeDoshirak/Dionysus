@@ -5,7 +5,12 @@ RUN dotnet restore Dionysus.Api/Dionysus.Api.csproj
 COPY Dionysus.Api/ Dionysus.Api/
 RUN dotnet publish Dionysus.Api/Dionysus.Api.csproj -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+ARG INSTALL_FFMPEG=true
+RUN if [ "$INSTALL_FFMPEG" = "true" ]; then \
+      apt-get update && \
+      apt-get install -y --no-install-recommends ffmpeg && \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
 WORKDIR /app
 COPY --from=build /app/publish .
 EXPOSE 8000

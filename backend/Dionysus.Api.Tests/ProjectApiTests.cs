@@ -13,4 +13,12 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         var response = await factory.CreateClient().PostAsync("/api/projects", form);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Swagger_document_is_available_for_multipart_project_upload()
+    {
+        var response = await factory.CreateClient().GetAsync("/swagger/v1/swagger.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
