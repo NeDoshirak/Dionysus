@@ -51,10 +51,17 @@ it('searches, creates, and retrieves local projects without network access', () 
   expect(searchLocalProjects('planning')).toEqual(expect.arrayContaining([
     expect.objectContaining({ id: project.id, name: 'Planning session' }),
   ]))
-  expect(getLocalProject(project.id)).toMatchObject({
+  const projectDetail = getLocalProject(project.id)
+
+  expect(projectDetail).toMatchObject({
     id: project.id,
     name: 'Planning session',
-    recordings: expect.any(Array),
-    transcriptSegments: expect.any(Array),
+    recordings: expect.arrayContaining([
+      expect.objectContaining({
+        fileName: 'meeting.mp3',
+        segments: expect.any(Array),
+      }),
+    ]),
   })
+  expect(projectDetail).not.toHaveProperty('transcriptSegments')
 })

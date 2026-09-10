@@ -7,14 +7,14 @@ const localProjects = [
     recordings: [
       {
         id: 'recording-1',
-        name: 'discovery.mp3',
-      },
-    ],
-    transcriptSegments: [
-      {
-        startSeconds: 0,
-        endSeconds: 12,
-        text: 'We discussed the project goals and priorities.',
+        fileName: 'discovery.mp3',
+        segments: [
+          {
+            startSeconds: 0,
+            endSeconds: 12,
+            text: 'We discussed the project goals and priorities.',
+          },
+        ],
       },
     ],
   },
@@ -55,15 +55,21 @@ export function createLocalProject({ name, media }) {
     recordings: [
       {
         id: crypto.randomUUID(),
-        name: media.name,
+        fileName: media.name,
+        segments: [],
       },
     ],
-    transcriptSegments: [],
   }
 
   localProjects.unshift(project)
 
-  return { ...project, recordings: [...project.recordings], transcriptSegments: [] }
+  return {
+    ...project,
+    recordings: project.recordings.map((recording) => ({
+      ...recording,
+      segments: [...recording.segments],
+    })),
+  }
 }
 
 export function getLocalProject(id) {
@@ -73,7 +79,9 @@ export function getLocalProject(id) {
 
   return {
     ...project,
-    recordings: project.recordings.map((recording) => ({ ...recording })),
-    transcriptSegments: project.transcriptSegments.map((segment) => ({ ...segment })),
+    recordings: project.recordings.map((recording) => ({
+      ...recording,
+      segments: recording.segments.map((segment) => ({ ...segment })),
+    })),
   }
 }
