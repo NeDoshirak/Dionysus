@@ -122,6 +122,8 @@ public class AuthApiTests(WebApplicationFactory<Program> factory) : IClassFixtur
 
         Assert.Contains("/api/auth/refresh", document);
         Assert.Contains("/api/auth/password-reset/confirm", document);
+        Assert.Contains("securitySchemes", document);
+        Assert.Contains("Bearer", document);
     }
 
     private static CodeService CreateCodeService()
