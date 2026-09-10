@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { AuthPage, LandingPage, ProjectsPage } from '@/pages'
+import { AuthPage, LandingPage, ProfilePage, ProjectsPage, SpecificationPage } from '@/pages'
 
 const routes = [
   { path: '/', name: 'landing', component: LandingPage },
@@ -9,8 +9,8 @@ const routes = [
   { path: '/confirm-email/success', name: 'confirmation-success', component: AuthPage },
   { path: '/reset-password', name: 'reset-password', component: AuthPage },
   { path: '/projects', name: 'projects', component: ProjectsPage },
-  { path: '/projects/:id/specification', name: 'specification' },
-  { path: '/profile', name: 'profile' },
+  { path: '/projects/:id/specification', name: 'specification', component: SpecificationPage },
+  { path: '/profile', name: 'profile', component: ProfilePage },
 ]
 
 const router = createRouter({

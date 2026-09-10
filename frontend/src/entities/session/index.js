@@ -1,2 +1,2 @@
 export { signUp, verifyEmail } from './api'
-export { getSession, setSession } from './model'
+export { clearSession, getSession, setSession } from './model'

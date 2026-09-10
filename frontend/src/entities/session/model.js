@@ -7,3 +7,7 @@ export function setSession(nextSession) {
 export function getSession() {
   return session ? { ...session } : null
 }
+
+export function clearSession() {
+  session = null
+}
