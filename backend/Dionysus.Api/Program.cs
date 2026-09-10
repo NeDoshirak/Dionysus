@@ -45,7 +45,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Введите access token в формате: Bearer {token}"
+        Description = "Введите только access token. Swagger добавит Bearer автоматически."
     });
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
