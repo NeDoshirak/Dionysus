@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - Use Vue 3 Composition API and `<script setup>`; do not add TypeScript.
+- Treat Figma React, Tailwind, and Code Connect output as visual reference only; do not add React, Tailwind, JSX, or Tailwind utility classes.
 - Follow FSD dependencies and import only another slice’s public `index.js` API.
 - Use local scoped `<style lang="sass">` with BEM class names; global styles belong in `src/app/styles`.
 - Auth illustrations are image placeholders, not newly drawn SVG files.
