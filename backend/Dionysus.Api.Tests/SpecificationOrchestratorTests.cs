@@ -28,7 +28,7 @@ public sealed class SpecificationOrchestratorTests
             .SingleAsync();
         var savedSegment = await db.TranscriptSegments.SingleAsync();
 
-        Assert.True(saved.Status == SpecificationAnalysisStatus.RunningStage3, saved.Error);
+        Assert.True(saved.Status == SpecificationAnalysisStatus.Completed, saved.Error);
         Assert.Equal("cleaned transcript", savedSegment.CleanedText);
         Assert.Equal("cleaned transcript", ai.Stage1Request!.Segments[0].Text);
         Assert.NotNull(saved.Stage0RawResponse);
@@ -145,6 +145,67 @@ public sealed class SpecificationOrchestratorTests
         Assert.Empty(topics[1].Statements);
     }
 
+    [Fact]
+    public async Task Stage3_runs_no_more_than_four_function_requests_at_once()
+    {
+        await using var db = CreateContext();
+        var (analysis, segment) = await SeedAsync(db);
+        var responses = ManyTopicResponses(segment.Id, 7);
+        var ai = new BlockingStage3AiService(responses);
+        var orchestrator = new SpecificationOrchestrator(db, ai, new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        Assert.InRange(ai.MaximumConcurrentStage3Calls, 1, 4);
+        Assert.Equal(7, await db.SpecificationFunctions.CountAsync());
+    }
+
+    [Fact]
+    public async Task Stage3_publishes_items_sources_and_project_contradictions_atomically()
+    {
+        await using var db = CreateContext();
+        var (analysis, segment) = await SeedAsync(db);
+        var responses = ValidResponses(segment.Id);
+        responses = responses with
+        {
+            Stage2 = responses.Stage2 with
+            {
+                Relations = [new StageRelationDto("rel-1", AnalysisRelationType.Contradicts, ["st-1"], ["st-2"], "Conflicting behavior")]
+            }
+        };
+        var orchestrator = new SpecificationOrchestrator(db, new ScriptedStructuredAiService(responses), new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        var saved = await db.SpecificationAnalyses
+            .Include(x => x.Functions).ThenInclude(x => x.StatementLinks)
+            .Include(x => x.Items).ThenInclude(x => x.StatementLinks)
+            .SingleAsync();
+        Assert.True(saved.Status == SpecificationAnalysisStatus.Completed, saved.Error ?? "no error");
+        Assert.NotNull(saved.CompletedAt);
+        Assert.Single(saved.Functions);
+        Assert.Equal(1, saved.Items.Count(x => x.Kind == SpecificationItemKind.ProjectContradiction));
+        Assert.Contains(saved.Items, x => x.Kind == SpecificationItemKind.FunctionalRequirement && !x.IsManual);
+        Assert.All(saved.Functions.Single().StatementLinks, link => Assert.Contains(link.AnalysisStatementId, saved.Statements.Select(statement => statement.Id)));
+        Assert.Equal(2, saved.Items.Single(x => x.Kind == SpecificationItemKind.ProjectContradiction).StatementLinks.Count);
+    }
+
+    [Fact]
+    public async Task Failed_one_stage3_function_publishes_no_final_rows()
+    {
+        await using var db = CreateContext();
+        var (analysis, segment) = await SeedAsync(db);
+        var responses = ManyTopicResponses(segment.Id, 2);
+        var orchestrator = new SpecificationOrchestrator(db, new FailingStage3AiService(responses, "topic-2"), new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        var saved = await db.SpecificationAnalyses.Include(x => x.Functions).Include(x => x.Items).SingleAsync();
+        Assert.Equal(SpecificationAnalysisStatus.Failed, saved.Status);
+        Assert.Empty(saved.Functions);
+        Assert.Empty(saved.Items);
+    }
+
     private static AppDbContext CreateContext(string? databaseName = null, params IInterceptor[] interceptors)
     {
         var builder = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName ?? Guid.NewGuid().ToString());
@@ -182,27 +243,96 @@ public sealed class SpecificationOrchestratorTests
             new Stage2StatementDto("st-1", "Users sign in.", AnalysisStatementStatus.Active, [segmentId]),
             new Stage2StatementDto("st-2", "Admins manage users.", AnalysisStatementStatus.Active, [segmentId])], [
             new StageRelationDto("rel-1", AnalysisRelationType.Related, ["st-1"], ["st-2"], "Related statements")]),
-        new Stage2ReviewResponse("1.0", [], [], [], []));
+        new Stage3FunctionResponse("1.0",
+            new Stage3FunctionDto("Authentication", "Authentication function", ["st-1", "st-2"]),
+            [new Stage3RoleDto("role-1", "User", "A person who signs in.", ["st-1"])],
+            [new Stage3FunctionalRequirementDto("req-1", "Sign in", "Users can sign in.", SpecificationPriority.Required, ["st-1"])],
+            [], [], [], [], []));
     }
 
-    private sealed record ScriptedResponses(Stage0CleanupResponse Stage0, Stage1ExtractionResponse Stage1, Stage2ReviewResponse Stage2, Stage2ReviewResponse Unused);
-
-    private sealed class ScriptedStructuredAiService(ScriptedResponses responses, bool cancelStage0 = false) : IStructuredSpecificationAiService
+    private static ScriptedResponses ManyTopicResponses(Guid segmentId, int count)
     {
+        var context = new StageBusinessContextDto("ctx-1", "The business needs sign-in.", [segmentId]);
+        var topics = Enumerable.Range(1, count)
+            .Select(i => new Stage1TopicDto($"topic-{i}", $"Topic {i}", [new Stage1StatementDto($"st-{i}", $"Statement {i}.", [segmentId])]))
+            .ToList();
+        var statements = topics.SelectMany(x => x.Statements)
+            .Select(x => new Stage2StatementDto(x.Id, x.Text, AnalysisStatementStatus.Active, x.SourceSegmentIds)).ToList();
+        var stage2Topics = topics.Select(x => new Stage2TopicDto(x.Id, x.Name, x.Statements.Select(statement => statement.Id).ToList())).ToList();
+        return new(
+            new Stage0CleanupResponse("1.0", [new Stage0CleanedSegmentDto(segmentId, "cleaned transcript")]),
+            new Stage1ExtractionResponse("1.0", [context], topics),
+            new Stage2ReviewResponse("1.0", [context], stage2Topics, statements, []),
+            new Stage3FunctionResponse("1.0", new Stage3FunctionDto("Function", "Description", ["st-1"]), [], [], [], [], [], [], []));
+    }
+
+    private sealed record ScriptedResponses(Stage0CleanupResponse Stage0, Stage1ExtractionResponse Stage1, Stage2ReviewResponse Stage2, Stage3FunctionResponse Stage3);
+
+    private class ScriptedStructuredAiService : IStructuredSpecificationAiService
+    {
+        protected ScriptedResponses Responses { get; }
+        private readonly bool _cancelStage0;
+
+        public ScriptedStructuredAiService(ScriptedResponses responses, bool cancelStage0 = false)
+        {
+            Responses = responses;
+            _cancelStage0 = cancelStage0;
+        }
+
         public Stage1ExtractionRequest? Stage1Request { get; private set; }
-        public Task<Stage0CleanupResponse> RunStage0Async(Stage0CleanupRequest request, CancellationToken ct) => CancelOr(() => responses.Stage0);
+        public Task<Stage0CleanupResponse> RunStage0Async(Stage0CleanupRequest request, CancellationToken ct) => CancelOr(() => Responses.Stage0);
         public Task<Stage1ExtractionResponse> RunStage1Async(Stage1ExtractionRequest request, CancellationToken ct)
         {
             Stage1Request = request;
-            return Task.FromResult(responses.Stage1);
+            return Task.FromResult(Responses.Stage1);
         }
-        public Task<Stage2ReviewResponse> RunStage2Async(Stage1ExtractionResponse request, CancellationToken ct) => Task.FromResult(responses.Stage2);
-        public Task<Stage3FunctionResponse> RunStage3Async(Stage3FunctionRequest request, CancellationToken ct) => throw new InvalidOperationException("Stage 3 must not run");
+        public Task<Stage2ReviewResponse> RunStage2Async(Stage1ExtractionResponse request, CancellationToken ct) => Task.FromResult(Responses.Stage2);
+        public virtual Task<Stage3FunctionResponse> RunStage3Async(Stage3FunctionRequest request, CancellationToken ct) => Task.FromResult(Responses.Stage3);
 
         private Task<T> CancelOr<T>(Func<T> result)
         {
-            if (cancelStage0) throw new OperationCanceledException();
+            if (_cancelStage0) throw new OperationCanceledException();
             return Task.FromResult(result());
+        }
+    }
+
+    private sealed class BlockingStage3AiService : ScriptedStructuredAiService
+    {
+        private int _active;
+        public int MaximumConcurrentStage3Calls { get; private set; }
+
+        public BlockingStage3AiService(ScriptedResponses responses) : base(responses) { }
+
+        public override async Task<Stage3FunctionResponse> RunStage3Async(Stage3FunctionRequest request, CancellationToken ct)
+        {
+            var active = Interlocked.Increment(ref _active);
+            MaximumConcurrentStage3Calls = Math.Max(MaximumConcurrentStage3Calls, active);
+            await Task.Delay(50, ct);
+            Interlocked.Decrement(ref _active);
+            var number = request.Function.TopicId["topic-".Length..];
+            return Responses.Stage3 with
+            {
+                Function = Responses.Stage3.Function with { Title = $"Function {number}", SourceStatementIds = request.Function.Statements.Select(x => x.Id).ToList() }
+            };
+        }
+    }
+
+    private sealed class FailingStage3AiService : ScriptedStructuredAiService
+    {
+        private readonly string _failingTopic;
+
+        public FailingStage3AiService(ScriptedResponses responses, string failingTopic) : base(responses)
+        {
+            _failingTopic = failingTopic;
+        }
+
+        public override Task<Stage3FunctionResponse> RunStage3Async(Stage3FunctionRequest request, CancellationToken ct)
+        {
+            if (request.Function.TopicId == _failingTopic) throw new InvalidOperationException("stage3 failure");
+            return Task.FromResult(Responses.Stage3 with
+            {
+                Function = Responses.Stage3.Function with { SourceStatementIds = request.Function.Statements.Select(x => x.Id).ToList() }
+            });
         }
     }
 
