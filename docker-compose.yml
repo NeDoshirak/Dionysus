@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dionysus}
+      POSTGRES_USER: ${POSTGRES_USER:-dionysus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dionysus}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    environment:
+      ASR_MODEL: ${WHISPER_MODEL:-base}
+      ASR_ENGINE: ${WHISPER_ENGINE:-openai_whisper}
+    ports:
+      - "9000:9000"
+    volumes:
+      - whisper_cache:/root/.cache
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dionysus}:${POSTGRES_PASSWORD:-dionysus}@db:5432/${POSTGRES_DB:-dionysus}
+      WHISPER_URL: http://whisper:9000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      whisper:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  whisper_cache:

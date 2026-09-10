@@ -1,0 +1,16 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet test backend/Dionysus.Api.Tests/Dionysus.Api.Tests.csproj
+      - run: dotnet build backend/Dionysus.Api/Dionysus.Api.csproj --no-restore
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package.json }
+      - run: npm install && npm run build
+        working-directory: frontend
+      - run: docker compose config
