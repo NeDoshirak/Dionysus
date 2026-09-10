@@ -137,6 +137,8 @@ public class AuthApiTests(WebApplicationFactory<Program> factory) : IClassFixtur
         Assert.False(paths.GetProperty("/api/auth/login").GetProperty("post").TryGetProperty("security", out _));
         Assert.True(paths.GetProperty("/api/auth/me").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
         Assert.True(paths.GetProperty("/api/projects").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
+        Assert.True(paths.GetProperty("/api/projects/search").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
+        Assert.True(paths.GetProperty("/api/projects/{id}/transcription-search").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
     }
 
     private static CodeService CreateCodeService()

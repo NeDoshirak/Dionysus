@@ -50,6 +50,14 @@ Refresh-токен хранится в `HttpOnly` cookie с `SameSite=Strict` и
 В Production cookie имеет флаг `Secure`; в Development флаг отключён, чтобы Swagger на
 `http://localhost` мог выполнять refresh. Сброс пароля отзывает все активные refresh-сессии.
 
+## Поиск
+
+- `GET /api/projects/search?query=...` — нечёткий поиск проектов текущего пользователя по названию;
+- `GET /api/projects/{projectId}/transcription-search?query=...` — нечёткий поиск по сегментам транскрипции внутри одного проекта.
+
+Обе ручки возвращают score релевантности и требуют access token. Поиск учитывает
+опечатки и похожие слова, а результаты сортируются от наиболее подходящих.
+
 Пример запроса refresh:
 
 ```bash

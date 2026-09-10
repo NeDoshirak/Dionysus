@@ -58,6 +58,64 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             project.CreatedAt,
             project.Recordings.OrderByDescending(x => x.CreatedAt).FirstOrDefault()?.Status ?? "empty")).ToList();
     }
+
+    [HttpGet("search")]
+    public async Task<IActionResult> Search([FromQuery] string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
+            return BadRequest(new { detail = "Query must contain at least 2 characters" });
+
+        var projects = await db.Projects
+            .AsNoTracking()
+            .Where(x => x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
+            .Include(x => x.Recordings)
+            .ToListAsync();
+
+        var results = FuzzySearch.Rank(projects, query, project => project.Name)
+            .Select(match => new ProjectSearchResultDto(
+                match.Value.Id,
+                match.Value.Name,
+                match.Value.CreatedAt,
+                match.Value.Recordings.OrderByDescending(x => x.CreatedAt).FirstOrDefault()?.Status ?? "empty",
+                match.Score))
+            .ToList();
+
+        return Ok(results);
+    }
+
+    [HttpGet("{id:guid}/transcription-search")]
+    public async Task<IActionResult> SearchTranscription(Guid id, [FromQuery] string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
+            return BadRequest(new { detail = "Query must contain at least 2 characters" });
+
+        var project = await db.Projects
+            .AsNoTracking()
+            .Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
+            .Include(x => x.Recordings)
+            .ThenInclude(x => x.Segments)
+            .FirstOrDefaultAsync();
+        if (project is null) return NotFound();
+
+        var candidates = project.Recordings
+            .SelectMany(recording => recording.Segments.Select(segment => new TranscriptionSearchCandidate(recording, segment)));
+        var results = FuzzySearch.Rank(candidates, query, candidate => candidate.Segment.Text)
+            .Select(match => new TranscriptionSearchResultDto(
+                project.Id,
+                project.Name,
+                match.Value.Recording.Id,
+                match.Value.Recording.FileName,
+                match.Value.Segment.StartSeconds,
+                match.Value.Segment.EndSeconds,
+                match.Value.Segment.Text,
+                match.Score))
+            .ToList();
+
+        return Ok(results);
+    }
+
+    private sealed record TranscriptionSearchCandidate(VoiceRecording Recording, TranscriptSegment Segment);
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id)
     {

@@ -6,6 +6,8 @@ public record TokenResponse(string AccessToken, DateTimeOffset ExpiresAt);
 public record TranscriptionSegmentDto(double StartSeconds, double EndSeconds, string Text);
 public record RecordingDetailsDto(Guid Id, string FileName, string ContentType, string SourceType, long SizeBytes, string Status, string? Error, string? Transcript, string? Language, IReadOnlyList<TranscriptionSegmentDto> Segments);
 public record ProjectSummaryDto(Guid Id, string Name, DateTimeOffset CreatedAt, string Status);
+public record ProjectSearchResultDto(Guid Id, string Name, DateTimeOffset CreatedAt, string Status, double Score);
+public record TranscriptionSearchResultDto(Guid ProjectId, string ProjectName, Guid RecordingId, string FileName, double StartSeconds, double EndSeconds, string Text, double Score);
 public record ProjectDetailsDto(Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<RecordingDetailsDto> Recordings);
 public record TranscriptionSegment(double StartSeconds, double EndSeconds, string Text);
 public record TranscriptionResult(string Text, string? Language, IReadOnlyList<TranscriptionSegment> Segments);
