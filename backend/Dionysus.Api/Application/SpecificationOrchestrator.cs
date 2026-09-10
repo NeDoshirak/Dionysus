@@ -152,11 +152,13 @@ public sealed class SpecificationOrchestrator(
     {
         var topics = analysis.Topics.ToDictionary(topic => topic.ExternalId, StringComparer.Ordinal);
         var statements = analysis.Statements.ToDictionary(statement => statement.ExternalId, StringComparer.Ordinal);
+        foreach (var statement in analysis.Statements)
+            statement.AnalysisTopicId = null;
+
         foreach (var topicDto in response.Topics)
         {
             var topic = topics[topicDto.Id];
             topic.Name = topicDto.Name;
-            foreach (var statement in topic.Statements.ToList()) statement.AnalysisTopicId = null;
             foreach (var statementId in topicDto.StatementIds)
             {
                 var statement = statements[statementId];

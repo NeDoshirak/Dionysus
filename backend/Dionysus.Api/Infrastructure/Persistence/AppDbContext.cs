@@ -33,6 +33,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .HasFilter("\"IsCurrent\" = TRUE")
             .IsUnique();
         modelBuilder.Entity<SpecificationAnalysis>().HasIndex(x => x.ProjectEntityId).IsUnique();
+        modelBuilder.Entity<SpecificationAnalysis>().Property(x => x.RunId).IsConcurrencyToken();
         modelBuilder.Entity<AnalysisTopic>().HasIndex(x => new { x.SpecificationAnalysisId, x.ExternalId }).IsUnique();
         modelBuilder.Entity<AnalysisStatement>().HasIndex(x => new { x.SpecificationAnalysisId, x.ExternalId }).IsUnique();
         modelBuilder.Entity<AnalysisRelation>().HasIndex(x => new { x.SpecificationAnalysisId, x.ExternalId }).IsUnique();

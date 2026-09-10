@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 
 public sealed class SpecificationOrchestratorTests
@@ -37,7 +38,8 @@ public sealed class SpecificationOrchestratorTests
         Assert.Contains(saved.Statements, x => x.IsBusinessContext && x.ExternalId == "ctx-1");
         var statements = saved.Statements.Where(x => !x.IsBusinessContext).ToList();
         Assert.Equal(2, statements.Count);
-        Assert.Equal(2, Assert.Single(saved.Topics).Statements.Count);
+        Assert.Equal(2, saved.Topics.Single(x => x.ExternalId == "topic-1").Statements.Count);
+        Assert.Empty(saved.Topics.Single(x => x.ExternalId == "topic-2").Statements);
         Assert.All(statements, statement => Assert.Equal(AnalysisStatementStatus.Active, statement.Status));
         var statement = statements[0];
         Assert.Equal(segment.Id, Assert.Single(statement.SegmentLinks).TranscriptSegmentId);
@@ -106,8 +108,49 @@ public sealed class SpecificationOrchestratorTests
         Assert.Equal(SpecificationAnalysisStatus.RunningStage0, saved.Status);
     }
 
-    private static AppDbContext CreateContext() => new(new DbContextOptionsBuilder<AppDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    [Fact]
+    public async Task Run_id_change_during_save_rejects_the_stale_mutation()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        await using var seedDb = CreateContext(databaseName);
+        var (analysis, segment) = await SeedAsync(seedDb);
+        var interceptor = new RunIdChangeInterceptor(databaseName);
+        await using var db = CreateContext(databaseName, interceptor);
+        var orchestrator = new SpecificationOrchestrator(db, new ScriptedStructuredAiService(ValidResponses(segment.Id)), new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var saved = await db.SpecificationAnalyses.SingleAsync();
+        var savedSegment = await db.TranscriptSegments.SingleAsync();
+        Assert.Equal(SpecificationAnalysisStatus.Queued, saved.Status);
+        Assert.NotEqual(analysis.RunId, saved.RunId);
+        Assert.Null(saved.Stage0RawResponse);
+        Assert.Null(savedSegment.CleanedText);
+    }
+
+    [Fact]
+    public async Task Stage2_clears_memberships_for_topics_omitted_from_response()
+    {
+        await using var db = CreateContext();
+        var (analysis, segment) = await SeedAsync(db);
+        var orchestrator = new SpecificationOrchestrator(db, new ScriptedStructuredAiService(ValidResponses(segment.Id)), new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var topics = await db.AnalysisTopics.Include(x => x.Statements).OrderBy(x => x.ExternalId).ToListAsync();
+        Assert.Equal(2, topics.Count);
+        Assert.Equal(2, topics[0].Statements.Count);
+        Assert.Empty(topics[1].Statements);
+    }
+
+    private static AppDbContext CreateContext(string? databaseName = null, params IInterceptor[] interceptors)
+    {
+        var builder = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName ?? Guid.NewGuid().ToString());
+        builder.AddInterceptors(interceptors);
+        return new AppDbContext(builder.Options);
+    }
 
     private static async Task<(SpecificationAnalysis Analysis, TranscriptSegment Segment)> SeedAsync(AppDbContext db)
     {
@@ -131,7 +174,8 @@ public sealed class SpecificationOrchestratorTests
         new Stage0CleanupResponse("1.0", [new Stage0CleanedSegmentDto(segmentId, "cleaned transcript")]),
         new Stage1ExtractionResponse("1.0", [context], [
             new Stage1TopicDto("topic-1", "Authentication", [
-                new Stage1StatementDto("st-1", "Users sign in.", [segmentId]),
+                new Stage1StatementDto("st-1", "Users sign in.", [segmentId])]),
+            new Stage1TopicDto("topic-2", "Administration", [
                 new Stage1StatementDto("st-2", "Admins manage users.", [segmentId])])]),
         new Stage2ReviewResponse("1.0", [context], [
             new Stage2TopicDto("topic-1", "Authentication", ["st-1", "st-2"])], [
@@ -159,6 +203,28 @@ public sealed class SpecificationOrchestratorTests
         {
             if (cancelStage0) throw new OperationCanceledException();
             return Task.FromResult(result());
+        }
+    }
+
+    private sealed class RunIdChangeInterceptor(string databaseName) : SaveChangesInterceptor
+    {
+        private bool _armed = true;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (_armed && eventData.Context is AppDbContext)
+            {
+                _armed = false;
+                await using var other = CreateContext(databaseName);
+                var analysis = await other.SpecificationAnalyses.SingleAsync(cancellationToken);
+                analysis.RunId = Guid.NewGuid();
+                await other.SaveChangesAsync(cancellationToken);
+            }
+
+            return await base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }
 }

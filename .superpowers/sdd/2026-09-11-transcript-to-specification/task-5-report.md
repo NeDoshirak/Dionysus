@@ -34,3 +34,27 @@
 ## Commit
 
 Committed directly on `main` as `Implement Task 5 specification orchestrator`.
+
+## Fix round 1
+
+Review findings addressed:
+
+1. `SpecificationAnalysis.RunId` is now configured as an EF optimistic concurrency token. Every orchestrator save includes the job RunId in its concurrency predicate, so a RunId change after the guard check causes the stale save to fail atomically. The existing failure path then rechecks RunId and leaves the newer run untouched.
+2. Stage 2 now clears `AnalysisTopicId` for every statement in the analysis before applying memberships from the response. Topics omitted from the response therefore no longer retain stale memberships.
+
+Regression coverage added:
+
+- `Run_id_change_during_save_rejects_the_stale_mutation` uses a save interceptor to change RunId between the orchestrator guard query and persistence, and verifies status/raw/cleaned data are unchanged.
+- `Stage2_clears_memberships_for_topics_omitted_from_response` verifies an omitted topic has no statements after normalization.
+
+Fix-round verification:
+
+- Focused suite: `dotnet test backend\\Dionysus.Api.Tests\\Dionysus.Api.Tests.csproj --no-restore --filter FullyQualifiedName~SpecificationOrchestratorTests` — 6 passed.
+
+Full-suite verification for fix round 1:
+
+- Full suite: `dotnet test backend\\Dionysus.Api.Tests\\Dionysus.Api.Tests.csproj --no-restore` — 61 passed, 8 failed during existing PostgreSQL persistence-test setup because the configured PostgreSQL role `dionysus` does not exist (`28000`).
+- The 8 failures are unchanged environment/setup failures; all Task 5 focused tests passed.
+- API build after the fixes: passed with 0 warnings and 0 errors.
+- A later fresh test-project build is blocked by unrelated uncommitted Task 4 edits in `ProjectApiTests.cs` (four-argument `ProjectsController`, `SpecificationStatus`, and missing `MemoryStream` imports). That file was left untouched and excluded from this commit.
+- Fix round 1 was committed directly on `main` after verification.
