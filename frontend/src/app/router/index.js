@@ -1,9 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ProjectsPage } from '@/pages'
+
+const routes = [
+  { path: '/', name: 'landing' },
+  { path: '/sign-up', name: 'sign-up' },
+  { path: '/sign-in', name: 'sign-in' },
+  { path: '/verify-email', name: 'verify-email' },
+  { path: '/reset-password', name: 'reset-password' },
+  { path: '/projects', name: 'projects' },
+  { path: '/projects/:id/specification', name: 'specification' },
+  { path: '/profile', name: 'profile' },
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [{ path: '/projects', name: 'projects', component: ProjectsPage }],
+  routes,
 })
 
 export default router
