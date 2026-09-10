@@ -26,13 +26,65 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
         var project = new ProjectEntity { OwnerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!, Name = name.Trim() };
         var recording = new VoiceRecording { ProjectEntityId = project.Id, FileName = sourceType == "video" ? Path.ChangeExtension(mediaFile.FileName, ".wav") : mediaFile.FileName, ContentType = sourceType == "video" ? "audio/wav" : type, SourceType = sourceType, SizeBytes = audio.LongLength, AudioData = audio };
         project.Recordings.Add(recording); db.Projects.Add(project); await db.SaveChangesAsync(ct);
-        try { recording.Transcript = await transcription.TranscribeAsync(audio, recording.FileName, ct); recording.Status = "completed"; await db.SaveChangesAsync(ct); return CreatedAtAction(nameof(Get), new { id = project.Id }, new { ProjectId = project.Id, project.Name, RecordingId = recording.Id, recording.Status, recording.Transcript }); }
+        try
+        {
+            var result = await transcription.TranscribeAsync(audio, recording.FileName, ct);
+            recording.Transcript = result.Text;
+            recording.Language = result.Language;
+            recording.Segments = result.Segments.Select(segment => new TranscriptSegment
+            {
+                VoiceRecordingId = recording.Id,
+                StartSeconds = segment.StartSeconds,
+                EndSeconds = segment.EndSeconds,
+                Text = segment.Text
+            }).ToList();
+            recording.Status = "completed";
+            await db.SaveChangesAsync(ct);
+            return CreatedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
+        }
         catch (Exception ex) { recording.Status = "failed"; recording.Error = ex.Message; await db.SaveChangesAsync(ct); return Problem("Transcription failed", statusCode: 502); }
     }
     [HttpGet]
-    public Task<List<ProjectEntity>> List() => db.Projects.Where(x => x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier)).Include(x => x.Recordings).ToListAsync();
+    public async Task<List<ProjectSummaryDto>> List()
+    {
+        var projects = await db.Projects
+            .Where(x => x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
+            .Include(x => x.Recordings)
+            .ToListAsync();
+        return projects.Select(project => new ProjectSummaryDto(
+            project.Id,
+            project.Name,
+            project.CreatedAt,
+            project.Recordings.OrderByDescending(x => x.CreatedAt).FirstOrDefault()?.Status ?? "empty")).ToList();
+    }
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> Get(Guid id) { var project = await db.Projects.Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier)).Include(x => x.Recordings).FirstOrDefaultAsync(); return project is null ? NotFound() : Ok(project); }
+    public async Task<IActionResult> Get(Guid id)
+    {
+        var project = await db.Projects
+            .Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
+            .Include(x => x.Recordings)
+            .ThenInclude(x => x.Segments)
+            .FirstOrDefaultAsync();
+        return project is null ? NotFound() : Ok(ToDetails(project));
+    }
+
+    private static ProjectDetailsDto ToDetails(ProjectEntity project) => new(
+        project.Id,
+        project.Name,
+        project.CreatedAt,
+        project.Recordings.Select(recording => new RecordingDetailsDto(
+            recording.Id,
+            recording.FileName,
+            recording.ContentType,
+            recording.SourceType,
+            recording.SizeBytes,
+            recording.Status,
+            recording.Error,
+            recording.Transcript,
+            recording.Language,
+            recording.Segments.OrderBy(x => x.StartSeconds)
+                .Select(segment => new TranscriptionSegmentDto(segment.StartSeconds, segment.EndSeconds, segment.Text))
+                .ToList())).ToList());
 }
 
 public sealed class CreateProjectRequest

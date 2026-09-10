@@ -18,8 +18,8 @@ services:
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
     environment:
-      ASR_MODEL: ${WHISPER_MODEL:-base}
-      ASR_ENGINE: ${WHISPER_ENGINE:-openai_whisper}
+      ASR_MODEL: ${WHISPER_MODEL:-small}
+      ASR_ENGINE: ${WHISPER_ENGINE:-faster_whisper}
     ports:
       - "9000:9000"
     volumes:
@@ -44,6 +44,7 @@ services:
       JWT_KEY: ${JWT_KEY}
       AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
       WHISPER_URL: http://whisper:9000
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME}

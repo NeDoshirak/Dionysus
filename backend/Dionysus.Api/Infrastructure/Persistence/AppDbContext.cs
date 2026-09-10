@@ -9,4 +9,5 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     public DbSet<VoiceRecording> VoiceRecordings => Set<VoiceRecording>();
+    public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
 }
