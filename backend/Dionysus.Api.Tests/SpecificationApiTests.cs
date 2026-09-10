@@ -53,6 +53,33 @@ public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory
     }
 
     [Fact]
+    public async Task Retry_removes_the_complete_generated_analysis_graph_before_requeueing()
+    {
+        await using var db = CreateDb();
+        var project = SeedCompleted(db, "user-1");
+        var analysis = project.SpecificationAnalysis!;
+        analysis.Status = SpecificationAnalysisStatus.Failed;
+        var statement = analysis.Statements.Single();
+        var relation = new AnalysisRelation { SpecificationAnalysisId = analysis.Id, ExternalId = "rel-1" };
+        relation.SourceStatementLinks.Add(new AnalysisRelationSourceStatement { AnalysisRelationId = relation.Id, AnalysisStatementId = statement.Id });
+        analysis.Relations.Add(relation);
+        db.AnalysisRelations.Add(relation);
+        db.AddRange(relation.SourceStatementLinks);
+        db.AddRange(relation.TargetStatementLinks);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var controller = CreateController(db, "user-1", new RecordingQueue());
+
+        var result = await controller.Retry(project.Id, CancellationToken.None);
+
+        Assert.IsType<AcceptedResult>(result);
+        Assert.Empty(await db.AnalysisTopics.Where(x => x.SpecificationAnalysisId == analysis.Id).ToListAsync());
+        Assert.Empty(await db.AnalysisStatements.Where(x => x.SpecificationAnalysisId == analysis.Id).ToListAsync());
+        Assert.Empty(await db.AnalysisRelations.Where(x => x.SpecificationAnalysisId == analysis.Id).ToListAsync());
+        Assert.Empty(await db.AnalysisRelationSourceStatements.Where(x => x.AnalysisRelation.SpecificationAnalysisId == analysis.Id).ToListAsync());
+    }
+
+    [Fact]
     public async Task Manual_item_is_marked_manual_and_rejects_foreign_source()
     {
         await using var db = CreateDb();
@@ -70,6 +97,30 @@ public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory
         var invalid = await controller.CreateItem(project.Id, function.Id,
             new CreateSpecificationItemRequest(SpecificationItemKind.Constraint, null, "bad", null, [Guid.NewGuid()]), CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(invalid);
+    }
+
+    [Fact]
+    public async Task Manual_create_and_update_map_source_navigations_after_save()
+    {
+        await using var db = CreateDb();
+        var project = SeedCompleted(db, "user-1");
+        var analysis = project.SpecificationAnalysis!;
+        var statementId = analysis.Statements.Single().Id;
+        var controller = CreateController(db, "user-1", new RecordingQueue());
+
+        var createdFunction = Assert.IsType<CreatedAtActionResult>(await controller.CreateFunction(project.Id,
+            new CreateSpecificationFunctionRequest("Created", "Description", 1, [statementId]), CancellationToken.None)).Value as SpecificationFunctionDto;
+        Assert.Equal(statementId, Assert.Single(createdFunction!.SourceStatements).Id);
+        var createdItem = Assert.IsType<CreatedAtActionResult>(await controller.CreateItem(project.Id, createdFunction.Id,
+            new CreateSpecificationItemRequest(SpecificationItemKind.Constraint, "Item", "Description", null, [statementId]), CancellationToken.None)).Value as SpecificationItemDto;
+        Assert.Equal(statementId, Assert.Single(createdItem!.SourceStatements).Id);
+
+        var updatedFunction = Assert.IsType<OkObjectResult>(await controller.UpdateFunction(project.Id, createdFunction.Id,
+            new UpdateSpecificationFunctionRequest("Updated", "Description", 2, [statementId]), CancellationToken.None)).Value as SpecificationFunctionDto;
+        Assert.Equal(statementId, Assert.Single(updatedFunction!.SourceStatements).Id);
+        var updatedItem = Assert.IsType<OkObjectResult>(await controller.UpdateItem(project.Id, createdFunction.Id, createdItem.Id,
+            new UpdateSpecificationItemRequest("Updated", "Description", null, [statementId]), CancellationToken.None)).Value as SpecificationItemDto;
+        Assert.Equal(statementId, Assert.Single(updatedItem!.SourceStatements).Id);
     }
 
     [Fact]

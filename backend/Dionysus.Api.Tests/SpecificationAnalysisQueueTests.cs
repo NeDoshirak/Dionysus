@@ -52,6 +52,32 @@ public sealed class SpecificationAnalysisQueueTests
         }
     }
 
+    [Fact]
+    public async Task Claim_allows_only_one_worker_to_claim_a_run()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName).Options;
+        await using (var db = new AppDbContext(options))
+        {
+            var analysis = new SpecificationAnalysis { Status = SpecificationAnalysisStatus.Queued };
+            db.SpecificationAnalyses.Add(analysis);
+            await db.SaveChangesAsync();
+
+            var services = new ServiceCollection()
+                .AddDbContext<AppDbContext>(builder => builder.UseInMemoryDatabase(databaseName))
+                .BuildServiceProvider();
+            var first = new SpecificationAnalysisWorker(services.GetRequiredService<IServiceScopeFactory>(), new RecordingQueue());
+            var second = new SpecificationAnalysisWorker(services.GetRequiredService<IServiceScopeFactory>(), new RecordingQueue());
+            var job = new SpecificationAnalysisJob(analysis.Id, analysis.RunId);
+
+            var results = await Task.WhenAll(first.TryClaimAsync(job, CancellationToken.None), second.TryClaimAsync(job, CancellationToken.None));
+
+            Assert.Single(results, claimed => claimed is not null);
+            await db.Entry(analysis).ReloadAsync();
+            Assert.Equal(SpecificationAnalysisStatus.RunningStage0, analysis.Status);
+        }
+    }
+
     private sealed class RecordingQueue : ISpecificationAnalysisQueue
     {
         public List<SpecificationAnalysisJob> Jobs { get; } = [];

@@ -23,16 +23,25 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
         if (analysis.Status != SpecificationAnalysisStatus.Failed)
             return Conflict(new { detail = "Only failed analyses can be retried." });
 
-        db.AnalysisTopics.RemoveRange(analysis.Topics);
-        db.AnalysisStatements.RemoveRange(analysis.Statements);
-        db.AnalysisRelations.RemoveRange(analysis.Relations);
-        db.SpecificationItems.RemoveRange(analysis.Items);
-        db.SpecificationFunctions.RemoveRange(analysis.Functions);
+        var analysisId = analysis.Id;
+        db.SpecificationFunctionStatements.RemoveRange(await db.SpecificationFunctionStatements.Where(x => x.SpecificationFunction.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.SpecificationItemStatements.RemoveRange(await db.SpecificationItemStatements.Where(x => x.SpecificationItem.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisStatementSegments.RemoveRange(await db.AnalysisStatementSegments.Where(x => x.AnalysisStatement.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisRelationSourceStatements.RemoveRange(await db.AnalysisRelationSourceStatements.Where(x => x.AnalysisRelation.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisRelationTargetStatements.RemoveRange(await db.AnalysisRelationTargetStatements.Where(x => x.AnalysisRelation.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.SpecificationItems.RemoveRange(await db.SpecificationItems.Where(x => x.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.SpecificationFunctions.RemoveRange(await db.SpecificationFunctions.Where(x => x.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisRelations.RemoveRange(await db.AnalysisRelations.Where(x => x.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisStatements.RemoveRange(await db.AnalysisStatements.Where(x => x.SpecificationAnalysisId == analysisId).ToListAsync(ct));
+        db.AnalysisTopics.RemoveRange(await db.AnalysisTopics.Where(x => x.SpecificationAnalysisId == analysisId).ToListAsync(ct));
         analysis.RunId = Guid.NewGuid();
         analysis.RetryCount++;
         analysis.Status = SpecificationAnalysisStatus.Queued;
         analysis.Error = null;
         analysis.CompletedAt = null;
+        analysis.Stage0RawResponse = null;
+        analysis.Stage1RawResponse = null;
+        analysis.Stage2RawResponse = null;
         await db.SaveChangesAsync(ct);
         await queue.EnqueueAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), ct);
         return Accepted(new { analysisId = analysis.Id, runId = analysis.RunId });
@@ -63,8 +72,8 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
         };
         db.SpecificationFunctions.Add(function);
         await db.SaveChangesAsync(ct);
-        await LoadFunction(projectId, function.Id, ct);
-        return CreatedAtAction(nameof(GetFunction), new { projectId, functionId = function.Id }, SpecificationMapper.ToFunction(function));
+        var loadedFunction = await LoadFunction(projectId, function.Id, ct);
+        return CreatedAtAction(nameof(GetFunction), new { projectId, functionId = function.Id }, SpecificationMapper.ToFunction(loadedFunction!));
     }
 
     [HttpPatch("functions/{functionId:guid}")]
@@ -84,7 +93,8 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
             ReplaceFunctionSources(function, request.SourceStatementIds);
         }
         await db.SaveChangesAsync(ct);
-        return Ok(SpecificationMapper.ToFunction(function));
+        var loadedFunction = await LoadFunction(projectId, functionId, ct);
+        return Ok(SpecificationMapper.ToFunction(loadedFunction!));
     }
 
     [HttpDelete("functions/{functionId:guid}")]
@@ -119,8 +129,8 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
         };
         db.SpecificationItems.Add(item);
         await db.SaveChangesAsync(ct);
-        await LoadItem(projectId, functionId, item.Id, ct);
-        return CreatedAtAction(nameof(GetFunction), new { projectId, functionId }, SpecificationMapper.ToItem(item));
+        var loadedItem = await LoadItem(projectId, functionId, item.Id, ct);
+        return CreatedAtAction(nameof(GetFunction), new { projectId, functionId }, SpecificationMapper.ToItem(loadedItem!));
     }
 
     [HttpPatch("functions/{functionId:guid}/items/{itemId:guid}")]
@@ -140,7 +150,8 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
             ReplaceItemSources(item, request.SourceStatementIds);
         }
         await db.SaveChangesAsync(ct);
-        return Ok(SpecificationMapper.ToItem(item));
+        var loadedItem = await LoadItem(projectId, functionId, itemId, ct);
+        return Ok(SpecificationMapper.ToItem(loadedItem!));
     }
 
     [HttpDelete("functions/{functionId:guid}/items/{itemId:guid}")]

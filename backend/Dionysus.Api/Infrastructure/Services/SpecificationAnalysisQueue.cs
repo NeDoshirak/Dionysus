@@ -18,6 +18,26 @@ public sealed class SpecificationAnalysisWorker(
     IServiceScopeFactory scopeFactory,
     ISpecificationAnalysisQueue queue) : BackgroundService
 {
+    public async Task<SpecificationAnalysisJob?> TryClaimAsync(SpecificationAnalysisJob job, CancellationToken cancellationToken)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var analysis = await db.SpecificationAnalyses.SingleOrDefaultAsync(x =>
+            x.Id == job.AnalysisId && x.RunId == job.RunId && x.Status == SpecificationAnalysisStatus.Queued, cancellationToken);
+        if (analysis is null) return null;
+        analysis.Status = SpecificationAnalysisStatus.RunningStage0;
+        analysis.RunId = Guid.NewGuid();
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return new SpecificationAnalysisJob(analysis.Id, analysis.RunId);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return null;
+        }
+    }
+
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await RecoverAsync(cancellationToken);
@@ -55,11 +75,13 @@ public sealed class SpecificationAnalysisWorker(
     {
         await foreach (var job in ReadJobs(stoppingToken))
         {
+            var claimedJob = await TryClaimAsync(job, stoppingToken);
+            if (claimedJob is null) continue;
             await using var scope = scopeFactory.CreateAsyncScope();
             var orchestrator = scope.ServiceProvider.GetRequiredService<ISpecificationAnalysisOrchestrator>();
             try
             {
-                await orchestrator.RunAsync(job, stoppingToken);
+                await orchestrator.RunAsync(claimedJob, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

@@ -109,6 +109,10 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
 
         var statementsById = output.Statements.ToDictionary(x => x.Id, StringComparer.Ordinal);
         RequireUniqueMatchingIds(output.Topics.Select(x => x.Id), TopicId, stage, "topic-ids");
+        if (output.Topics.Count > input.Topics.Count)
+        {
+            Fail(stage, "topic-identity");
+        }
         var topicAssignments = output.Topics.SelectMany(x => x.StatementIds).ToArray();
         if (topicAssignments.Length != statementsById.Count
             || topicAssignments.Distinct(StringComparer.Ordinal).Count() != statementsById.Count
@@ -178,7 +182,12 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
 
     private static void ValidateImmutableBusinessContext(IReadOnlyList<StageBusinessContextDto> input, IReadOnlyList<StageBusinessContextDto> output, string stage)
     {
-        if (input.Count != output.Count || !input.OrderBy(x => x.Id, StringComparer.Ordinal).SequenceEqual(output.OrderBy(x => x.Id, StringComparer.Ordinal)))
+        var expected = input.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray();
+        var actual = output.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray();
+        if (expected.Length != actual.Length || expected.Zip(actual).Any(pair =>
+                !string.Equals(pair.First.Id, pair.Second.Id, StringComparison.Ordinal)
+                || !string.Equals(pair.First.Text, pair.Second.Text, StringComparison.Ordinal)
+                || !SameSet(pair.First.SourceSegmentIds, pair.Second.SourceSegmentIds)))
         {
             Fail(stage, "context-identity");
         }

@@ -10,6 +10,7 @@ using System.Security.Claims;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Linq;
 using Xunit;
 
 public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
@@ -140,6 +141,8 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(502, problem.StatusCode);
+        Assert.DoesNotContain("provider secret", System.Text.Json.JsonSerializer.Serialize(problem.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Transcription failed.", await db.VoiceRecordings.Select(x => x.Error).SingleAsync());
         Assert.Empty(await db.SpecificationAnalyses.ToListAsync());
         Assert.Empty(queue.Jobs);
     }
@@ -202,7 +205,7 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
     private sealed class FailedTranscription : ITranscriptionService
     {
         public Task<TranscriptionResult> TranscribeAsync(byte[] audio, string fileName, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("transcription failed");
+            throw new InvalidOperationException("provider secret: token=abc");
     }
 
     private sealed class RecordingQueue : ISpecificationAnalysisQueue

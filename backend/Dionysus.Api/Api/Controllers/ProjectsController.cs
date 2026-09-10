@@ -49,7 +49,7 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             catch { }
             return CreatedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
         }
-        catch (Exception ex) { recording.Status = "failed"; recording.Error = ex.Message; await db.SaveChangesAsync(ct); return Problem("Transcription failed", statusCode: 502); }
+        catch (Exception) { recording.Status = "failed"; recording.Error = "Transcription failed."; await db.SaveChangesAsync(ct); return Problem("Transcription failed.", statusCode: 502); }
     }
     [HttpGet]
     public async Task<List<ProjectSummaryDto>> List()

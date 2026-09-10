@@ -25,6 +25,7 @@ public sealed class SpecificationOrchestratorTests
             .Include(x => x.Statements).ThenInclude(x => x.SegmentLinks)
             .Include(x => x.Relations).ThenInclude(x => x.SourceStatementLinks)
             .Include(x => x.Relations).ThenInclude(x => x.TargetStatementLinks)
+            .Include(x => x.Items)
             .SingleAsync();
         var savedSegment = await db.TranscriptSegments.SingleAsync();
 
@@ -36,6 +37,10 @@ public sealed class SpecificationOrchestratorTests
         Assert.NotNull(saved.Stage2RawResponse);
         Assert.Equal(3, saved.Statements.Count);
         Assert.Contains(saved.Statements, x => x.IsBusinessContext && x.ExternalId == "ctx-1");
+        var businessContext = Assert.Single(saved.Items, x => x.Kind == SpecificationItemKind.BusinessContext);
+        Assert.Null(businessContext.SpecificationFunctionId);
+        Assert.Equal("The business needs sign-in.", businessContext.Description);
+        Assert.Equal(0, businessContext.SortOrder);
         var statements = saved.Statements.Where(x => !x.IsBusinessContext).ToList();
         Assert.Equal(2, statements.Count);
         Assert.Equal(2, saved.Topics.Single(x => x.ExternalId == "topic-1").Statements.Count);
@@ -143,6 +148,28 @@ public sealed class SpecificationOrchestratorTests
         Assert.Equal(2, topics.Count);
         Assert.Equal(2, topics[0].Statements.Count);
         Assert.Empty(topics[1].Statements);
+    }
+
+    [Fact]
+    public async Task Stage2_reconciles_renamed_merged_topics_by_statement_membership()
+    {
+        await using var db = CreateContext();
+        var (analysis, segment) = await SeedAsync(db);
+        var responses = ValidResponses(segment.Id) with
+        {
+            Stage2 = ValidResponses(segment.Id).Stage2 with
+            {
+                Topics = [new Stage2TopicDto("topic-9", "Identity and access", ["st-1", "st-2"])]
+            }
+        };
+        var orchestrator = new SpecificationOrchestrator(db, new ScriptedStructuredAiService(responses), new SpecificationContractValidator());
+
+        await orchestrator.RunAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), CancellationToken.None);
+
+        var saved = await db.AnalysisTopics.Include(x => x.Statements).SingleAsync(x => x.ExternalId == "topic-9");
+        Assert.Equal("topic-9", saved.ExternalId);
+        Assert.Equal("Identity and access", saved.Name);
+        Assert.Equal(2, saved.Statements.Count);
     }
 
     [Fact]

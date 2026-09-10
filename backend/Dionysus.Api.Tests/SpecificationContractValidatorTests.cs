@@ -94,6 +94,38 @@ public sealed class SpecificationContractValidatorTests
     }
 
     [Fact]
+    public void Stage2_compares_business_context_by_values_not_source_list_reference()
+    {
+        var input = ValidStage1() with
+        {
+            BusinessContext = [new StageBusinessContextDto("ctx-1", "The business context.", [SegmentOne, SegmentTwo])]
+        };
+        var output = ValidStage2() with
+        {
+            BusinessContext = [new StageBusinessContextDto("ctx-1", "The business context.", [SegmentTwo, SegmentOne])]
+        };
+
+        _validator.ValidateStage2(input, output);
+    }
+
+    [Fact]
+    public void Stage2_allows_renamed_and_merged_topics_when_all_statements_remain_assigned()
+    {
+        var input = new Stage1ExtractionResponse("1.0", [], [
+            new Stage1TopicDto("topic-1", "Authentication", [new Stage1StatementDto("st-1", "First fact.", [SegmentOne])]),
+            new Stage1TopicDto("topic-2", "Access", [new Stage1StatementDto("st-2", "Second fact.", [SegmentOne])])
+        ]);
+        var output = new Stage2ReviewResponse("1.0", [],
+            [new Stage2TopicDto("topic-9", "Identity and access", ["st-1", "st-2"])],
+            [
+                new Stage2StatementDto("st-1", "First fact.", AnalysisStatementStatus.Active, [SegmentOne]),
+                new Stage2StatementDto("st-2", "Second fact.", AnalysisStatementStatus.Active, [SegmentOne])
+            ], []);
+
+        _validator.ValidateStage2(input, output);
+    }
+
+    [Fact]
     public void Stage2_rejects_duplicate_input_statement_ids_before_building_the_dictionary()
     {
         var input = new Stage1ExtractionResponse("1.0", [], [

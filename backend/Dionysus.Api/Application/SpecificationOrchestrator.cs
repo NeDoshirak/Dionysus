@@ -178,6 +178,26 @@ public sealed class SpecificationOrchestrator(
         try
         {
             var sortOrder = 0;
+            var businessContext = analysis.Statements
+                .Where(statement => statement.IsBusinessContext)
+                .OrderBy(statement => statement.ExternalId, StringComparer.Ordinal)
+                .ToList();
+            if (businessContext.Count > 0)
+            {
+                var item = new SpecificationItem
+                {
+                    SpecificationAnalysisId = analysis.Id,
+                    Kind = SpecificationItemKind.BusinessContext,
+                    Description = string.Join("\n", businessContext.Select(statement => statement.Text)),
+                    SortOrder = sortOrder++,
+                    IsManual = false
+                };
+                foreach (var statement in businessContext)
+                    item.StatementLinks.Add(new SpecificationItemStatement { SpecificationItemId = item.Id, AnalysisStatementId = statement.Id });
+                db.Add(item);
+                db.AddRange(item.StatementLinks);
+            }
+
             foreach (var result in results.OrderBy(result => TopicOrder(result.Topic.ExternalId)).ThenBy(result => result.Topic.ExternalId, StringComparer.Ordinal))
             {
                 var function = new SpecificationFunction
@@ -322,39 +342,70 @@ public sealed class SpecificationOrchestrator(
 
     private void PersistStage2(SpecificationAnalysis analysis, Stage2ReviewResponse response)
     {
-        var topics = analysis.Topics.ToDictionary(topic => topic.ExternalId, StringComparer.Ordinal);
+        var existingTopics = analysis.Topics
+            .Select(topic => (Topic: topic, OriginalExternalId: topic.ExternalId))
+            .ToList();
         var statements = analysis.Statements.ToDictionary(statement => statement.ExternalId, StringComparer.Ordinal);
-        foreach (var statement in analysis.Statements)
+        var topicAssignments = response.Topics
+            .Select(topic => (Topic: topic, StatementIds: topic.StatementIds.ToHashSet(StringComparer.Ordinal)))
+            .ToList();
+
+        foreach (var existing in existingTopics)
+            existing.Topic.ExternalId = $"stage2-pending-{Guid.NewGuid():N}";
+
+        foreach (var statement in analysis.Statements.Where(statement => !statement.IsBusinessContext))
             statement.AnalysisTopicId = null;
 
-        foreach (var topicDto in response.Topics)
+        var unusedTopics = existingTopics.Select(x => x.Topic).ToHashSet();
+        foreach (var assignment in topicAssignments)
         {
-            var topic = topics[topicDto.Id];
-            topic.Name = topicDto.Name;
-            foreach (var statementId in topicDto.StatementIds)
+            var topic = unusedTopics
+                .OrderByDescending(existing => existing.Statements.Count(statement => assignment.StatementIds.Contains(statement.ExternalId)))
+                .ThenBy(existing => TopicOrder(existingTopics.Single(x => x.Topic == existing).OriginalExternalId))
+                .ThenBy(existing => existing.Id)
+                .First();
+            unusedTopics.Remove(topic);
+            topic.ExternalId = assignment.Topic.Id;
+            topic.Name = assignment.Topic.Name;
+            foreach (var statementId in assignment.Topic.StatementIds)
             {
                 var statement = statements[statementId];
                 statement.AnalysisTopicId = topic.Id;
             }
         }
+        var outputTopicIds = topicAssignments.Select(x => x.Topic.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var unused in unusedTopics)
+        {
+            var originalId = existingTopics.Single(x => x.Topic == unused).OriginalExternalId;
+            unused.ExternalId = outputTopicIds.Contains(originalId)
+                ? $"stage2-unused-{Guid.NewGuid():N}"
+                : originalId;
+        }
 
         foreach (var statementDto in response.Statements)
             statements[statementDto.Id].Status = statementDto.Status;
 
+        var existingRelations = analysis.Relations.ToDictionary(x => x.ExternalId, StringComparer.Ordinal);
+        foreach (var relation in analysis.Relations.ToList())
+        {
+            db.AnalysisRelationSourceStatements.RemoveRange(relation.SourceStatementLinks);
+            db.AnalysisRelationTargetStatements.RemoveRange(relation.TargetStatementLinks);
+        }
+        foreach (var relation in analysis.Relations.Where(x => response.Relations.All(dto => dto.Id != x.ExternalId)).ToList())
+            db.AnalysisRelations.Remove(relation);
+
         foreach (var relationDto in response.Relations)
         {
-            var relation = new AnalysisRelation
-            {
-                SpecificationAnalysisId = analysis.Id,
-                ExternalId = relationDto.Id,
-                Type = relationDto.Type,
-                Reason = relationDto.Reason
-            };
+            var relation = existingRelations.TryGetValue(relationDto.Id, out var existing)
+                ? existing
+                : new AnalysisRelation { SpecificationAnalysisId = analysis.Id, ExternalId = relationDto.Id };
+            relation.Type = relationDto.Type;
+            relation.Reason = relationDto.Reason;
             foreach (var sourceId in relationDto.SourceStatementIds)
                 relation.SourceStatementLinks.Add(new AnalysisRelationSourceStatement { AnalysisRelationId = relation.Id, AnalysisStatementId = statements[sourceId].Id });
             foreach (var targetId in relationDto.TargetStatementIds)
                 relation.TargetStatementLinks.Add(new AnalysisRelationTargetStatement { AnalysisRelationId = relation.Id, AnalysisStatementId = statements[targetId].Id });
-            analysis.Relations.Add(relation);
+            if (existing is null) analysis.Relations.Add(relation);
             db.Add(relation);
             db.AddRange(relation.SourceStatementLinks);
             db.AddRange(relation.TargetStatementLinks);
