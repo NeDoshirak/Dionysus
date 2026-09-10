@@ -9,7 +9,7 @@ public static class SpecificationJson
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         PropertyNameCaseInsensitive = false,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
     };
 
     public static T Deserialize<T>(string json)
@@ -22,8 +22,15 @@ public static class SpecificationJson
         using var document = JsonDocument.Parse(json);
         RejectNullValues(document.RootElement);
 
-        return JsonSerializer.Deserialize<T>(json, Options)
+        var value = JsonSerializer.Deserialize<T>(json, Options)
             ?? throw new JsonException("AI response is empty");
+
+        if (value is ISpecificationStageContract contract && contract.SchemaVersion != "1.0")
+        {
+            throw new JsonException("AI response uses an unsupported schema version.");
+        }
+
+        return value;
     }
 
     private static void RejectNullValues(JsonElement element)
@@ -50,13 +57,18 @@ public static class SpecificationJson
     }
 }
 
+public interface ISpecificationStageContract
+{
+    string SchemaVersion { get; }
+}
+
 public sealed record Stage0CleanupRequest(
     [property: JsonRequired] string SchemaVersion,
-    [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments);
+    [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments) : ISpecificationStageContract;
 
 public sealed record Stage0CleanupResponse(
     [property: JsonRequired] string SchemaVersion,
-    [property: JsonRequired] IReadOnlyList<Stage0CleanedSegmentDto> Segments);
+    [property: JsonRequired] IReadOnlyList<Stage0CleanedSegmentDto> Segments) : ISpecificationStageContract;
 
 public sealed record StageSegmentDto(
     [property: JsonRequired] Guid Id,
@@ -70,12 +82,12 @@ public sealed record Stage0CleanedSegmentDto(
 
 public sealed record Stage1ExtractionRequest(
     [property: JsonRequired] string SchemaVersion,
-    [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments);
+    [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments) : ISpecificationStageContract;
 
 public sealed record Stage1ExtractionResponse(
     [property: JsonRequired] string SchemaVersion,
     [property: JsonRequired] IReadOnlyList<StageBusinessContextDto> BusinessContext,
-    [property: JsonRequired] IReadOnlyList<Stage1TopicDto> Topics);
+    [property: JsonRequired] IReadOnlyList<Stage1TopicDto> Topics) : ISpecificationStageContract;
 
 public sealed record StageBusinessContextDto(
     [property: JsonRequired] string Id,
@@ -97,7 +109,7 @@ public sealed record Stage2ReviewResponse(
     [property: JsonRequired] IReadOnlyList<StageBusinessContextDto> BusinessContext,
     [property: JsonRequired] IReadOnlyList<Stage2TopicDto> Topics,
     [property: JsonRequired] IReadOnlyList<Stage2StatementDto> Statements,
-    [property: JsonRequired] IReadOnlyList<StageRelationDto> Relations);
+    [property: JsonRequired] IReadOnlyList<StageRelationDto> Relations) : ISpecificationStageContract;
 
 public sealed record Stage2TopicDto(
     [property: JsonRequired] string Id,
@@ -120,7 +132,7 @@ public sealed record StageRelationDto(
 public sealed record Stage3FunctionRequest(
     [property: JsonRequired] string SchemaVersion,
     [property: JsonRequired] IReadOnlyList<StageBusinessContextDto> BusinessContext,
-    [property: JsonRequired] Stage3FunctionInputDto Function);
+    [property: JsonRequired] Stage3FunctionInputDto Function) : ISpecificationStageContract;
 
 public sealed record Stage3FunctionInputDto(
     [property: JsonRequired] string TopicId,
@@ -137,7 +149,22 @@ public sealed record Stage3FunctionResponse(
     [property: JsonRequired] IReadOnlyList<Stage3DescriptionItemDto> Constraints,
     [property: JsonRequired] IReadOnlyList<Stage3DescriptionItemDto> Conditions,
     [property: JsonRequired] IReadOnlyList<Stage3DescriptionItemDto> Agreements,
-    [property: JsonRequired] IReadOnlyList<Stage3KeyQuestionDto> KeyQuestions);
+    [property: JsonRequired] IReadOnlyList<Stage3KeyQuestionDto> KeyQuestions) : ISpecificationStageContract;
+
+public enum SpecificationPriority
+{
+    Required,
+    Desirable,
+    Future,
+    Unknown
+}
+
+public enum KeyQuestionReason
+{
+    Contradiction,
+    Unresolved,
+    MissingInformation
+}
 
 public sealed record Stage3FunctionDto(
     [property: JsonRequired] string Title,
@@ -154,7 +181,7 @@ public sealed record Stage3FunctionalRequirementDto(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string Title,
     [property: JsonRequired] string Description,
-    [property: JsonRequired] string Priority,
+    [property: JsonRequired] SpecificationPriority Priority,
     [property: JsonRequired] IReadOnlyList<string> SourceStatementIds);
 
 public sealed record Stage3UserScenarioDto(
@@ -173,7 +200,7 @@ public sealed record Stage3KeyQuestionDto(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string Title,
     [property: JsonRequired] string Description,
-    [property: JsonRequired] string Reason,
+    [property: JsonRequired] KeyQuestionReason Reason,
     [property: JsonRequired] IReadOnlyList<string> SourceStatementIds);
 
 public sealed record SpecificationDetailsDto(

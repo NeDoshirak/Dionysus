@@ -39,6 +39,84 @@ public sealed class SpecificationContractSerializationTests
     }
 
     [Fact]
+    public void Stage2_response_rejects_numeric_statement_status()
+    {
+        const string json = """
+            {
+              "schemaVersion":"1.0",
+              "businessContext":[],
+              "topics":[],
+              "statements":[
+                { "id":"st-1", "text":"A fact.", "status":0, "sourceSegmentIds":["00000000-0000-0000-0000-000000000001"] }
+              ],
+              "relations":[]
+            }
+            """;
+
+        Assert.Throws<JsonException>(() => SpecificationJson.Deserialize<Stage2ReviewResponse>(json));
+    }
+
+    [Fact]
+    public void Stage2_response_rejects_numeric_relation_type()
+    {
+        const string json = """
+            {
+              "schemaVersion":"1.0",
+              "businessContext":[],
+              "topics":[],
+              "statements":[],
+              "relations":[
+                { "id":"rel-1", "type":0, "sourceStatementIds":["st-1"], "targetStatementIds":["st-2"], "reason":"Same fact." }
+              ]
+            }
+            """;
+
+        Assert.Throws<JsonException>(() => SpecificationJson.Deserialize<Stage2ReviewResponse>(json));
+    }
+
+    [Fact]
+    public void Stage3_response_rejects_numeric_requirement_priority()
+    {
+        const string json = """
+            {
+              "schemaVersion":"1.0",
+              "function": { "title":"Authentication", "description":"Corporate sign-in.", "sourceStatementIds":["st-1"] },
+              "roles":[],
+              "functionalRequirements":[
+                { "id":"req-1", "title":"Sign in", "description":"Use an account.", "priority":0, "sourceStatementIds":["st-1"] }
+              ],
+              "userScenarios":[],
+              "constraints":[],
+              "conditions":[],
+              "agreements":[],
+              "keyQuestions":[]
+            }
+            """;
+
+        Assert.Throws<JsonException>(() => SpecificationJson.Deserialize<Stage3FunctionResponse>(json));
+    }
+
+    [Fact]
+    public void Stage3_response_rejects_an_unsupported_schema_version()
+    {
+        const string json = """
+            {
+              "schemaVersion":"2.0",
+              "function": { "title":"Authentication", "description":"Corporate sign-in.", "sourceStatementIds":["st-1"] },
+              "roles":[],
+              "functionalRequirements":[],
+              "userScenarios":[],
+              "constraints":[],
+              "conditions":[],
+              "agreements":[],
+              "keyQuestions":[]
+            }
+            """;
+
+        Assert.Throws<JsonException>(() => SpecificationJson.Deserialize<Stage3FunctionResponse>(json));
+    }
+
+    [Fact]
     public void Stage3_response_deserializes_required_empty_arrays()
     {
         var response = SpecificationJson.Deserialize<Stage3FunctionResponse>(ValidStage3Json);
