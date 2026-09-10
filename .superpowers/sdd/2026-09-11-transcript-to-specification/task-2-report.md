@@ -74,3 +74,62 @@ Result: passed 36/36, failed 0, skipped 0.
 ## Commit
 
 Implementation commit: `14a4679` (`feat: define specification pipeline contracts`).
+
+---
+
+# Review Fix Report, Round 1
+
+## Findings addressed
+
+1. `JsonStringEnumConverter` was configured with its default `allowIntegerValues: true`, which accepted numeric values for Task 1 statement-status and relation-type enums. The converter now uses `allowIntegerValues: false` while retaining camel-case string naming.
+2. `SpecificationJson.Deserialize<T>` only checked whether binding produced a non-null value; it did not validate the root stage contract's version. All root stage contract records now implement `ISpecificationStageContract`, and the generic deserialize boundary rejects every version except exactly `"1.0"` after strict JSON binding.
+3. Functional requirement priority is now an explicit `SpecificationPriority` enum so the same string-only policy applies to `required`, `desirable`, `future`, and `unknown`. Key-question reason is likewise represented by its finite `KeyQuestionReason` contract enum.
+
+## TDD evidence
+
+### RED
+
+Added focused tests before changing production code, then ran:
+
+```powershell
+dotnet test backend\Dionysus.Api.Tests\Dionysus.Api.Tests.csproj --filter FullyQualifiedName~SpecificationContractSerializationTests
+```
+
+Result: 3 failed and 8 passed.
+
+- A numeric stage-2 statement status was accepted.
+- A numeric stage-2 relation type was accepted.
+- An otherwise valid stage-3 response with `schemaVersion: "2.0"` was accepted.
+
+The numeric requirement-priority test already threw because the old contract field was a string. It is retained as a regression test after changing priority to an explicit enum, which proves numeric enum tokens remain rejected by the shared converter policy.
+
+### GREEN
+
+Set `allowIntegerValues: false`, added the stage-contract marker boundary and exact-version check, and converted stage-3 priority/reason to their finite contract enums. Reran the focused suite:
+
+```powershell
+dotnet test backend\Dionysus.Api.Tests\Dionysus.Api.Tests.csproj --filter FullyQualifiedName~SpecificationContractSerializationTests
+```
+
+Result: passed 11/11.
+
+## Verification
+
+Ran the full backend suite with a fresh temporary PostgreSQL 16 container in the repository Docker network. The container was stopped and removed after the run:
+
+```powershell
+docker run --rm --network dionysus_default -e TEST_DATABASE_URL='<temporary PostgreSQL connection>' -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test backend/Dionysus.Api.Tests/Dionysus.Api.Tests.csproj
+```
+
+Result: passed 40/40, failed 0, skipped 0.
+
+## Self-review
+
+- Unknown-member rejection and case-sensitive binding remain configured before contract-version validation; no permissive fallback was added.
+- Numeric enum values fail before a contract object can be accepted, while camel-case enum strings remain the supported wire format.
+- The schema-version check applies uniformly to every root stage request and response through `ISpecificationStageContract`.
+- The scope remains limited to Task 2 contracts, serialization tests, and this report.
+
+## Commit
+
+Review-fix implementation: `a862418` (`fix: enforce strict specification contract values`).
