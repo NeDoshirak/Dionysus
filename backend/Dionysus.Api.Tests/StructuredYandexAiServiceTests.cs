@@ -25,6 +25,7 @@ public sealed class StructuredYandexAiServiceTests
             service.RunStage1Async(ValidStage1Request(), CancellationToken.None));
 
         Assert.DoesNotContain("secret provider detail", exception.Message);
+        Assert.Equal("InvalidOperationException", exception.DiagnosticCode);
     }
 
     [Fact]

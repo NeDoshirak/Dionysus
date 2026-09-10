@@ -2,6 +2,11 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
+public sealed class YandexAiResponseFormatException(string diagnosticCode) : Exception("Yandex AI returned an unusable response format.")
+{
+    public string DiagnosticCode { get; } = diagnosticCode;
+}
+
 public sealed class YandexResponsesParser
 {
     public static YandexAiResult Parse(string json)
@@ -24,12 +29,23 @@ public sealed class YandexResponsesParser
     {
         if (!root.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array) return string.Empty;
 
-        return string.Join("\n", output.EnumerateArray()
-            .Where(item => item.TryGetProperty("content", out _))
+        var text = string.Join("\n", output.EnumerateArray()
+            .Where(item => item.TryGetProperty("content", out var content)
+                           && content.ValueKind == JsonValueKind.Array)
             .SelectMany(item => item.GetProperty("content").EnumerateArray())
-            .Where(content => content.TryGetProperty("text", out _))
+            .Where(content => content.TryGetProperty("type", out var type)
+                              && type.ValueKind == JsonValueKind.String
+                              && type.GetString() == "output_text"
+                              && content.TryGetProperty("text", out _))
             .Select(content => content.GetProperty("text").GetString())
             .Where(text => !string.IsNullOrWhiteSpace(text)));
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new YandexAiResponseFormatException("missing-output-text");
+        }
+
+        return text;
     }
 }
 
@@ -38,7 +54,10 @@ public sealed class YandexAiException(int statusCode, string message) : Exceptio
     public int StatusCode { get; } = statusCode;
 }
 
-public sealed class YandexAiService(IHttpClientFactory clients, IConfiguration configuration) : ITextGenerationService
+public sealed class YandexAiService(
+    IHttpClientFactory clients,
+    IConfiguration configuration,
+    ILogger<YandexAiService> logger) : ITextGenerationService
 {
     public async Task<YandexAiResult> RespondAsync(string input, string? instructions, CancellationToken cancellationToken)
     {
@@ -62,6 +81,18 @@ public sealed class YandexAiService(IHttpClientFactory clients, IConfiguration c
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
             throw new YandexAiException((int)response.StatusCode, "Yandex AI request failed");
-        return YandexResponsesParser.Parse(body);
+        try
+        {
+            return YandexResponsesParser.Parse(body);
+        }
+        catch (YandexAiResponseFormatException exception)
+        {
+            logger.LogError(
+                exception,
+                "Yandex AI response could not be parsed. DiagnosticCode: {DiagnosticCode}; ResponseLength: {ResponseLength}",
+                exception.DiagnosticCode,
+                body.Length);
+            throw;
+        }
     }
 }

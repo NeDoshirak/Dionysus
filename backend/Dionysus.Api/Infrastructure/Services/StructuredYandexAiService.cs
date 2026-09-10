@@ -5,13 +5,22 @@ public sealed class SpecificationAiInfrastructureException : Exception
     public SpecificationAiInfrastructureException(Exception innerException)
         : base("The specification AI provider is temporarily unavailable.", innerException)
     {
+        DiagnosticCode = innerException switch
+        {
+            YandexAiResponseFormatException formatException => formatException.DiagnosticCode,
+            YandexAiException yandexException => $"yandex-http-{yandexException.StatusCode}",
+            _ => innerException.GetType().Name
+        };
     }
+
+    public string DiagnosticCode { get; }
 }
 
 public sealed class StructuredYandexAiService(
     ITextGenerationService textGeneration,
     ISpecificationPromptFactory prompts,
-    ISpecificationContractValidator validator) : IStructuredSpecificationAiService
+    ISpecificationContractValidator validator,
+    ILogger<StructuredYandexAiService>? logger = null) : IStructuredSpecificationAiService
 {
     public Task<Stage0CleanupResponse> RunStage0Async(Stage0CleanupRequest request, CancellationToken ct) =>
         RunAsync<Stage0CleanupRequest, Stage0CleanupResponse>(request, prompts.Stage0Instructions(), response => validator.ValidateStage0(request, response), ct);
@@ -48,12 +57,18 @@ public sealed class StructuredYandexAiService(
             validate(response);
             return response;
         }
-        catch (SpecificationContractException)
+        catch (SpecificationContractException exception)
         {
+            logger?.LogWarning(
+                "Specification AI contract violation. Stage: {Stage}; ContractStage: {ContractStage}; Rule: {Rule}",
+                typeof(TRequest).Name,
+                exception.Stage,
+                exception.Rule);
             throw;
         }
         catch (JsonException)
         {
+            logger?.LogWarning("Specification AI returned invalid contract JSON. Stage: {Stage}", typeof(TRequest).Name);
             throw new SpecificationContractException("provider-response", "json");
         }
         catch (OperationCanceledException)
@@ -62,6 +77,11 @@ public sealed class StructuredYandexAiService(
         }
         catch (Exception exception)
         {
+            logger?.LogError(
+                "Specification AI stage failed. Stage: {Stage}; FailureType: {FailureType}; DiagnosticCode: {DiagnosticCode}",
+                typeof(TRequest).Name,
+                exception.GetType().Name,
+                new SpecificationAiInfrastructureException(exception).DiagnosticCode);
             throw new SpecificationAiInfrastructureException(exception);
         }
     }

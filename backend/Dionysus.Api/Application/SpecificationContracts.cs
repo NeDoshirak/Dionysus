@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 
 public static class SpecificationJson
 {
@@ -19,6 +20,7 @@ public static class SpecificationJson
             throw new JsonException("AI response is empty");
         }
 
+        json = NormalizeLegacyStage3FunctionName<T>(json);
         using var document = JsonDocument.Parse(json);
         RejectNullValues(document.RootElement);
 
@@ -31,6 +33,24 @@ public static class SpecificationJson
         }
 
         return value;
+    }
+
+    private static string NormalizeLegacyStage3FunctionName<T>(string json)
+    {
+        if (typeof(T) != typeof(Stage3FunctionResponse))
+        {
+            return json;
+        }
+
+        var root = JsonNode.Parse(json)?.AsObject();
+        if (root?["function"] is not JsonObject function || function.ContainsKey("title") || function["name"] is not JsonNode name)
+        {
+            return json;
+        }
+
+        function["title"] = name.DeepClone();
+        function.Remove("name");
+        return root.ToJsonString();
     }
 
     private static void RejectNullValues(JsonElement element)

@@ -71,7 +71,7 @@ public sealed class SpecificationOrchestratorTests
         db.ChangeTracker.Clear();
         var saved = await db.SpecificationAnalyses.Include(x => x.Functions).Include(x => x.Items).SingleAsync();
         Assert.Equal(SpecificationAnalysisStatus.Failed, saved.Status);
-        Assert.Equal("stage2 failed: SpecificationContractException", saved.Error);
+        Assert.Equal("stage2 failed: stage2/context-identity", saved.Error);
         Assert.Empty(saved.Functions);
         Assert.Empty(saved.Items);
         Assert.NotNull(saved.Stage0RawResponse);
@@ -231,6 +231,7 @@ public sealed class SpecificationOrchestratorTests
 
         var saved = await db.SpecificationAnalyses.Include(x => x.Functions).Include(x => x.Items).SingleAsync();
         Assert.Equal(SpecificationAnalysisStatus.Failed, saved.Status);
+        Assert.Equal("stage3 failed: topic-2/InvalidOperationException", saved.Error);
         Assert.Empty(saved.Functions);
         Assert.Empty(saved.Items);
     }

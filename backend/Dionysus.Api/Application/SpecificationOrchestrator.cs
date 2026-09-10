@@ -1,11 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 public sealed class SpecificationOrchestrator(
     AppDbContext db,
     IStructuredSpecificationAiService ai,
-    ISpecificationContractValidator validator) : ISpecificationAnalysisOrchestrator
+    ISpecificationContractValidator validator,
+    ILogger<SpecificationOrchestrator>? logger = null) : ISpecificationAnalysisOrchestrator
 {
+    private readonly ILogger<SpecificationOrchestrator> _logger = logger ?? NullLogger<SpecificationOrchestrator>.Instance;
     public async Task RunAsync(SpecificationAnalysisJob job, CancellationToken ct)
     {
         var analysis = await LoadAsync(job.AnalysisId, ct);
@@ -102,9 +106,29 @@ public sealed class SpecificationOrchestrator(
         var analysis = await db.SpecificationAnalyses.SingleOrDefaultAsync(x => x.Id == job.AnalysisId);
         if (analysis is null || analysis.RunId != job.RunId || analysis.Status == SpecificationAnalysisStatus.Completed) return;
         analysis.Status = SpecificationAnalysisStatus.Failed;
-        analysis.Error = $"stage{stage} failed: {exception.GetType().Name}";
+        var (topicId, cause) = exception is Stage3TopicException topicException
+            ? (topicException.TopicId, topicException.InnerException ?? topicException)
+            : ((string?)null, exception);
+        var diagnosticCode = DiagnosticCode(cause);
+        analysis.Error = topicId is null
+            ? $"stage{stage} failed: {diagnosticCode}"
+            : $"stage{stage} failed: {topicId}/{diagnosticCode}";
+        _logger.LogError(
+            "Specification analysis failed. AnalysisId: {AnalysisId}; Stage: {Stage}; TopicId: {TopicId}; FailureType: {FailureType}; DiagnosticCode: {DiagnosticCode}",
+            job.AnalysisId,
+            stage,
+            topicId,
+            cause.GetType().Name,
+            diagnosticCode);
         await db.SaveChangesAsync();
     }
+
+    private static string DiagnosticCode(Exception exception) => exception switch
+    {
+        SpecificationContractException contractException => $"{contractException.Stage}/{contractException.Rule}",
+        SpecificationAiInfrastructureException infrastructureException => infrastructureException.DiagnosticCode,
+        _ => exception.GetType().Name
+    };
 
     private async Task<IReadOnlyList<Stage3Result>> RunStage3Async(SpecificationAnalysis analysis, CancellationToken ct)
     {
@@ -143,6 +167,10 @@ public sealed class SpecificationOrchestrator(
                 var response = await ai.RunStage3Async(request, ct);
                 validator.ValidateStage3(request, response);
                 return new Stage3Result(topic, response);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                throw new Stage3TopicException(topic.ExternalId, exception);
             }
             finally
             {
@@ -290,6 +318,11 @@ public sealed class SpecificationOrchestrator(
     }
 
     private sealed record Stage3Result(AnalysisTopic Topic, Stage3FunctionResponse Response);
+
+    private sealed class Stage3TopicException(string topicId, Exception innerException) : Exception("Stage 3 topic failed.", innerException)
+    {
+        public string TopicId { get; } = topicId;
+    }
 
     private static int TopicOrder(string externalId) =>
         int.TryParse(externalId.AsSpan("topic-".Length), out var value) ? value : int.MaxValue;

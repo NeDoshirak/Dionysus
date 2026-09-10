@@ -131,6 +131,22 @@ public sealed class SpecificationContractSerializationTests
     }
 
     [Fact]
+    public void Stage3_response_accepts_legacy_function_name_as_title()
+    {
+        const string json = """
+            {
+              "schemaVersion":"1.0",
+              "function": { "name":"Authentication", "description":"Corporate sign-in.", "sourceStatementIds":["st-1"] },
+              "roles":[], "functionalRequirements":[], "userScenarios":[], "constraints":[], "conditions":[], "agreements":[], "keyQuestions":[]
+            }
+            """;
+
+        var response = SpecificationJson.Deserialize<Stage3FunctionResponse>(json);
+
+        Assert.Equal("Authentication", response.Function.Title);
+    }
+
+    [Fact]
     public void Stage3_response_rejects_an_absent_required_collection()
     {
         const string json = """
