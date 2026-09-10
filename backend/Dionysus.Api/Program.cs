@@ -29,6 +29,7 @@ builder.Services.AddScoped<ITextGenerationService, YandexAiService>();
 builder.Services.AddScoped<ISpecificationContractValidator, SpecificationContractValidator>();
 builder.Services.AddScoped<ISpecificationPromptFactory, SpecificationPromptFactory>();
 builder.Services.AddScoped<IStructuredSpecificationAiService, StructuredYandexAiService>();
+builder.Services.AddScoped<ISpecificationAnalysisOrchestrator, SpecificationOrchestrator>();
 builder.Services.AddSingleton<ISpecificationAnalysisQueue, SpecificationAnalysisQueue>();
 builder.Services.AddHostedService<SpecificationAnalysisWorker>();
 builder.Services.AddHttpClient("whisper", client => { client.BaseAddress = new Uri(builder.Configuration["WHISPER_URL"] ?? "http://localhost:9000"); client.Timeout = TimeSpan.FromMinutes(5); });
