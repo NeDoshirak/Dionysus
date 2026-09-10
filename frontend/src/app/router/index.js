@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { LandingPage } from '@/pages/landing'
+import AuthPage from '@/pages/auth/AuthPage.vue'
 
 const routes = [
   { path: '/', name: 'landing', component: LandingPage },
-  { path: '/sign-up', name: 'sign-up' },
+  { path: '/sign-up', name: 'sign-up', component: AuthPage },
   { path: '/sign-in', name: 'sign-in' },
-  { path: '/verify-email', name: 'verify-email' },
+  { path: '/verify-email', name: 'verify-email', component: AuthPage },
+  { path: '/confirm-email/success', name: 'confirmation-success', component: AuthPage },
   { path: '/reset-password', name: 'reset-password' },
   { path: '/projects', name: 'projects' },
   { path: '/projects/:id/specification', name: 'specification' },

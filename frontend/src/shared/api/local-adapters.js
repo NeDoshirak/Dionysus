@@ -85,3 +85,14 @@ export function getLocalProject(id) {
     })),
   }
 }
+
+export async function signUpLocal({ email }) {
+  return { email }
+}
+
+export async function verifyEmailLocal() {
+  return {
+    accessToken: 'local-access-token',
+    expiresAt: '2026-09-11T12:00:00.000Z',
+  }
+}
