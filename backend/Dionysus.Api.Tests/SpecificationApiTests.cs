@@ -59,6 +59,8 @@ public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory
         var project = SeedCompleted(db, "user-1");
         var analysis = project.SpecificationAnalysis!;
         analysis.Status = SpecificationAnalysisStatus.Failed;
+        analysis.Stage1RawResponse = "stale stage 1 response";
+        analysis.Stage2RawResponse = "stale stage 2 response";
         var statement = analysis.Statements.Single();
         var relation = new AnalysisRelation { SpecificationAnalysisId = analysis.Id, ExternalId = "rel-1" };
         relation.SourceStatementLinks.Add(new AnalysisRelationSourceStatement { AnalysisRelationId = relation.Id, AnalysisStatementId = statement.Id });
@@ -77,6 +79,9 @@ public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory
         Assert.Empty(await db.AnalysisStatements.Where(x => x.SpecificationAnalysisId == analysis.Id).ToListAsync());
         Assert.Empty(await db.AnalysisRelations.Where(x => x.SpecificationAnalysisId == analysis.Id).ToListAsync());
         Assert.Empty(await db.AnalysisRelationSourceStatements.Where(x => x.AnalysisRelation.SpecificationAnalysisId == analysis.Id).ToListAsync());
+        var retried = await db.SpecificationAnalyses.SingleAsync();
+        Assert.Null(retried.Stage1RawResponse);
+        Assert.Null(retried.Stage2RawResponse);
     }
 
     [Fact]
@@ -106,6 +111,7 @@ public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory
         var project = SeedCompleted(db, "user-1");
         var analysis = project.SpecificationAnalysis!;
         var statementId = analysis.Statements.Single().Id;
+        db.ChangeTracker.Clear();
         var controller = CreateController(db, "user-1", new RecordingQueue());
 
         var createdFunction = Assert.IsType<CreatedAtActionResult>(await controller.CreateFunction(project.Id,

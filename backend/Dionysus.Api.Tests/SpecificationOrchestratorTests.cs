@@ -25,7 +25,7 @@ public sealed class SpecificationOrchestratorTests
             .Include(x => x.Statements).ThenInclude(x => x.SegmentLinks)
             .Include(x => x.Relations).ThenInclude(x => x.SourceStatementLinks)
             .Include(x => x.Relations).ThenInclude(x => x.TargetStatementLinks)
-            .Include(x => x.Items)
+            .Include(x => x.Items).ThenInclude(x => x.StatementLinks)
             .SingleAsync();
         var savedSegment = await db.TranscriptSegments.SingleAsync();
 
@@ -41,6 +41,8 @@ public sealed class SpecificationOrchestratorTests
         Assert.Null(businessContext.SpecificationFunctionId);
         Assert.Equal("The business needs sign-in.", businessContext.Description);
         Assert.Equal(0, businessContext.SortOrder);
+        var contextStatement = Assert.Single(saved.Statements, x => x.IsBusinessContext && x.ExternalId == "ctx-1");
+        Assert.Equal(contextStatement.Id, Assert.Single(businessContext.StatementLinks).AnalysisStatementId);
         var statements = saved.Statements.Where(x => !x.IsBusinessContext).ToList();
         Assert.Equal(2, statements.Count);
         Assert.Equal(2, saved.Topics.Single(x => x.ExternalId == "topic-1").Statements.Count);
