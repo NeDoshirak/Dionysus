@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
 using Xunit;
 
 public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
@@ -81,7 +84,7 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         db.Projects.Add(project);
         await db.SaveChangesAsync();
 
-        var controller = new ProjectsController(db, null!, null!)
+        var controller = new ProjectsController(db, null!, null!, null!)
         {
             ControllerContext = new ControllerContext
             {
@@ -98,5 +101,95 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         Assert.Equal("audio/mpeg", file.ContentType);
         Assert.Equal(new byte[] { 1, 2, 3 }, file.FileContents);
         Assert.True(file.EnableRangeProcessing);
+    }
+
+    [Fact]
+    public async Task Create_project_persists_and_queues_specification_analysis_after_transcription()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+        var queue = new RecordingQueue();
+        var controller = CreateController(db, new SuccessfulTranscription(), queue);
+
+        var result = await controller.Create(CreateRequest(), CancellationToken.None);
+
+        var created = Assert.IsType<CreatedAtActionResult>(result);
+        var details = Assert.IsType<ProjectDetailsDto>(created.Value);
+        var analysis = await db.SpecificationAnalyses.SingleAsync();
+        var recording = await db.VoiceRecordings.SingleAsync();
+        Assert.Equal(SpecificationAnalysisStatus.Queued.ToString(), details.SpecificationStatus);
+        Assert.DoesNotContain("Stage0RawResponse", System.Text.Json.JsonSerializer.Serialize(details));
+        Assert.True(recording.IsCurrent);
+        Assert.Equal(SpecificationAnalysisStatus.Queued, analysis.Status);
+        Assert.Equal(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), Assert.Single(queue.Jobs));
+    }
+
+    [Fact]
+    public async Task Create_project_does_not_create_analysis_when_transcription_fails()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+        var queue = new RecordingQueue();
+        var controller = CreateController(db, new FailedTranscription(), queue);
+
+        var result = await controller.Create(CreateRequest(), CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, problem.StatusCode);
+        Assert.Empty(await db.SpecificationAnalyses.ToListAsync());
+        Assert.Empty(queue.Jobs);
+    }
+
+    private static ProjectsController CreateController(AppDbContext db, ITranscriptionService transcription, ISpecificationAnalysisQueue queue) =>
+        new(db, null!, transcription, queue)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, "user-1")], "test"))
+                }
+            }
+        };
+
+    private static CreateProjectRequest CreateRequest() => new()
+    {
+        Name = "Meeting",
+        Media = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "voice.wav")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "audio/wav"
+        }
+    };
+
+    private sealed class SuccessfulTranscription : ITranscriptionService
+    {
+        public Task<TranscriptionResult> TranscribeAsync(byte[] audio, string fileName, CancellationToken cancellationToken) =>
+            Task.FromResult(new TranscriptionResult("transcript", "en", [new TranscriptionSegment(0, 1, "segment")]));
+    }
+
+    private sealed class FailedTranscription : ITranscriptionService
+    {
+        public Task<TranscriptionResult> TranscribeAsync(byte[] audio, string fileName, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("transcription failed");
+    }
+
+    private sealed class RecordingQueue : ISpecificationAnalysisQueue
+    {
+        public List<SpecificationAnalysisJob> Jobs { get; } = [];
+
+        public ValueTask EnqueueAsync(SpecificationAnalysisJob job, CancellationToken ct)
+        {
+            Jobs.Add(job);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<SpecificationAnalysisJob> DequeueAsync(CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 }

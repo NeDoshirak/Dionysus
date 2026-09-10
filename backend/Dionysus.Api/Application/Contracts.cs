@@ -9,7 +9,7 @@ public record RecordingDetailsDto(Guid Id, string FileName, string ContentType, 
 public record ProjectSummaryDto(Guid Id, string Name, DateTimeOffset CreatedAt, string Status);
 public record ProjectSearchResultDto(Guid Id, string Name, DateTimeOffset CreatedAt, string Status, double Score);
 public record TranscriptionSearchResultDto(Guid ProjectId, string ProjectName, Guid RecordingId, string FileName, double StartSeconds, double EndSeconds, string Text, double Score);
-public record ProjectDetailsDto(Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<RecordingDetailsDto> Recordings);
+public record ProjectDetailsDto(Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<RecordingDetailsDto> Recordings, string? SpecificationStatus);
 public record TranscriptionSegment(double StartSeconds, double EndSeconds, string Text);
 public record TranscriptionResult(string Text, string? Language, IReadOnlyList<TranscriptionSegment> Segments);
 public record YandexAiRequest(string Input, string? Instructions);

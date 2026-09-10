@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 [ApiController]
 [Authorize]
 [Route("api/projects")]
-public sealed class ProjectsController(AppDbContext db, IMediaConverter media, ITranscriptionService transcription) : ControllerBase
+public sealed class ProjectsController(AppDbContext db, IMediaConverter media, ITranscriptionService transcription, ISpecificationAnalysisQueue queue) : ControllerBase
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -24,7 +24,7 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
         try { audio = sourceType == "video" ? await media.ExtractAudioAsync(stream.ToArray(), Path.GetExtension(mediaFile.FileName), ct) : stream.ToArray(); }
         catch (Exception ex) { return Problem(ex.Message, statusCode: 422); }
         var project = new ProjectEntity { OwnerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!, Name = name.Trim() };
-        var recording = new VoiceRecording { ProjectEntityId = project.Id, FileName = sourceType == "video" ? Path.ChangeExtension(mediaFile.FileName, ".wav") : mediaFile.FileName, ContentType = sourceType == "video" ? "audio/wav" : type, SourceType = sourceType, SizeBytes = audio.LongLength, AudioData = audio };
+        var recording = new VoiceRecording { ProjectEntityId = project.Id, FileName = sourceType == "video" ? Path.ChangeExtension(mediaFile.FileName, ".wav") : mediaFile.FileName, ContentType = sourceType == "video" ? "audio/wav" : type, SourceType = sourceType, SizeBytes = audio.LongLength, AudioData = audio, IsCurrent = true };
         project.Recordings.Add(recording); db.Projects.Add(project); await db.SaveChangesAsync(ct);
         try
         {
@@ -41,6 +41,12 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             db.TranscriptSegments.AddRange(recording.Segments);
             recording.Status = "completed";
             await db.SaveChangesAsync(ct);
+            var analysis = new SpecificationAnalysis { ProjectEntityId = project.Id, Project = project };
+            project.SpecificationAnalysis = analysis;
+            db.SpecificationAnalyses.Add(analysis);
+            await db.SaveChangesAsync(ct);
+            try { await queue.EnqueueAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), ct); }
+            catch { }
             return CreatedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
         }
         catch (Exception ex) { recording.Status = "failed"; recording.Error = ex.Message; await db.SaveChangesAsync(ct); return Problem("Transcription failed", statusCode: 502); }
@@ -94,6 +100,7 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             .Where(x => x.Id == id && x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier))
             .Include(x => x.Recordings)
             .ThenInclude(x => x.Segments)
+            .Include(x => x.SpecificationAnalysis)
             .FirstOrDefaultAsync();
         if (project is null) return NotFound();
 
@@ -160,7 +167,8 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
             recording.Language,
             recording.Segments.OrderBy(x => x.StartSeconds)
                 .Select(segment => new TranscriptionSegmentDto(segment.StartSeconds, segment.EndSeconds, segment.Text))
-                .ToList())).ToList());
+                .ToList())).ToList(),
+        project.SpecificationAnalysis?.Status.ToString());
 }
 
 public sealed class CreateProjectRequest
