@@ -58,6 +58,15 @@ Refresh-токен хранится в `HttpOnly` cookie с `SameSite=Strict` и
 Обе ручки возвращают score релевантности и требуют access token. Поиск учитывает
 опечатки и похожие слова, а результаты сортируются от наиболее подходящих.
 
+## Yandex AI Studio
+
+Для работы с DeepSeek v4 Flash задайте в `.env` `YANDEX_AI_API_KEY`,
+`YANDEX_AI_FOLDER_ID` и `YANDEX_AI_MODEL`. Ключ используется только backend и
+не передаётся frontend.
+
+`POST /api/ai/respond` принимает JSON `{ "input": "...", "instructions": "..." }`
+и возвращает текст ответа модели. Ручка требует access token.
+
 Пример запроса refresh:
 
 ```bash

@@ -11,3 +11,6 @@ public record TranscriptionSearchResultDto(Guid ProjectId, string ProjectName, G
 public record ProjectDetailsDto(Guid Id, string Name, DateTimeOffset CreatedAt, IReadOnlyList<RecordingDetailsDto> Recordings);
 public record TranscriptionSegment(double StartSeconds, double EndSeconds, string Text);
 public record TranscriptionResult(string Text, string? Language, IReadOnlyList<TranscriptionSegment> Segments);
+public record YandexAiRequest(string Input, string? Instructions);
+public record YandexAiResponseDto(string ResponseId, string Model, string Text, int? TotalTokens);
+public record YandexAiResult(string ResponseId, string Model, string Text, int? TotalTokens);

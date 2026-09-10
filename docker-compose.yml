@@ -45,6 +45,9 @@ services:
       AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
       WHISPER_URL: http://whisper:9000
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
+      YANDEX_AI_API_KEY: ${YANDEX_AI_API_KEY}
+      YANDEX_AI_FOLDER_ID: ${YANDEX_AI_FOLDER_ID}
+      YANDEX_AI_MODEL: ${YANDEX_AI_MODEL:-gpt://${YANDEX_AI_FOLDER_ID}/deepseek-v4-flash/latest}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME}
