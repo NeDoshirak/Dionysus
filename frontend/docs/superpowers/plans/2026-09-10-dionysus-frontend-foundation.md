@@ -23,6 +23,7 @@
 - Always implement applicable loading, empty, error, and success states.
 - Run `npm run lint` and `npm run build` after code, style, or configuration changes.
 - Before beginning any Stage-2 batch, run `git pull --rebase --autostash` in this repository and inspect `../backend` read-only for controller/DTO changes.
+- Stage-2 local backend base URL is `http://localhost:8000`; before changing an integration adapter, inspect `http://localhost:8000/swagger/index.html` and verify `GET http://localhost:8000/health`. Do not call Whisper at `http://localhost:9000` from the browser.
 
 ## Target File Structure
 
