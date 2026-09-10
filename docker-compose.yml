@@ -37,7 +37,9 @@ services:
       - valkey_data:/data
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      network: host
     environment:
       DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB:-dionysus};Username=${POSTGRES_USER:-dionysus};Password=${POSTGRES_PASSWORD:-dionysus}
       VALKEY_CONNECTION: valkey:6379
