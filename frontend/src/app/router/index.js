@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { LandingPage } from '@/pages/landing'
-import { AuthPage } from '@/pages/auth'
+import { AuthPage, LandingPage, ProjectsPage } from '@/pages'
 
 const routes = [
   { path: '/', name: 'landing', component: LandingPage },
@@ -9,7 +8,7 @@ const routes = [
   { path: '/verify-email', name: 'verify-email', component: AuthPage },
   { path: '/confirm-email/success', name: 'confirmation-success', component: AuthPage },
   { path: '/reset-password', name: 'reset-password', component: AuthPage },
-  { path: '/projects', name: 'projects' },
+  { path: '/projects', name: 'projects', component: ProjectsPage },
   { path: '/projects/:id/specification', name: 'specification' },
   { path: '/profile', name: 'profile' },
 ]
