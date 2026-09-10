@@ -28,3 +28,14 @@ it('routes unconfirmed users to email verification with their email', async () =
 
   expect(push).toHaveBeenCalledWith({ name: 'verify-email', query: { email: 'unconfirmed@dionysus.app' } })
 })
+
+it('shows email validation feedback without calling the sign-in adapter', async () => {
+  const wrapper = mount(SignInForm)
+
+  await wrapper.get('input[type="email"]').setValue('invalid-email')
+  await wrapper.get('input[type="password"]').setValue('Demo1234')
+  await wrapper.get('form').trigger('submit')
+
+  expect(wrapper.text()).toContain('Введите корректный email.')
+  expect(wrapper.text()).not.toContain('Неверный email или пароль.')
+})

@@ -1,3 +1,5 @@
+import { validateEmail, validatePassword } from '@/shared/lib/validation'
+
 const localProjects = [
   {
     id: 'project-1',
@@ -98,7 +100,7 @@ export async function verifyEmailLocal() {
 }
 
 export async function signInLocal({ email, password }) {
-  if (!email?.trim() || !password) throw { code: 'validation' }
+  if (!validateEmail(email) || !password) throw { code: 'validation' }
   if (email.trim().toLowerCase() === 'unconfirmed@dionysus.app') throw { code: 'unconfirmed-email' }
   if (email.trim().toLowerCase() !== 'demo@dionysus.app' || password !== 'Demo1234') throw { code: 'invalid-credentials' }
 
@@ -109,12 +111,13 @@ export async function signInLocal({ email, password }) {
 }
 
 export async function requestPasswordResetLocal({ email }) {
-  if (!email?.trim() || !email.includes('@')) throw { code: 'validation' }
+  if (!validateEmail(email)) throw { code: 'validation' }
   if (email.trim().toLowerCase() === 'server-error@dionysus.app') throw { code: 'server-error' }
   return { email: email.trim() }
 }
 
 export async function confirmPasswordResetLocal({ email, code, password }) {
-  if (!email?.trim() || code !== '123456' || !password) throw { code: 'server-error' }
+  if (!validateEmail(email) || !validatePassword(password).isValid) throw { code: 'validation' }
+  if (code !== '123456') throw { code: 'server-error' }
   return { email: email.trim() }
 }

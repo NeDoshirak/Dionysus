@@ -1,9 +1,9 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { setSession } from '@/entities/session'
 import { signInLocal } from '@/shared/api/local-adapters'
-import { validatePassword } from '@/shared/lib/validation'
+import { validateEmail, validatePassword } from '@/shared/lib/validation'
 import { BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
 
 const router = useRouter()
@@ -11,10 +11,14 @@ const email = ref('')
 const password = ref('')
 const state = ref('initial')
 const errorMessage = ref('')
+const emailError = computed(() => {
+  if (state.value !== 'validation' || validateEmail(email.value)) return ''
+  return email.value.trim() ? 'Введите корректный email.' : 'Введите email.'
+})
 
 async function submitForm() {
   errorMessage.value = ''
-  if (!email.value.trim() || !validatePassword(password.value).isValid) {
+  if (!validateEmail(email.value) || !validatePassword(password.value).isValid) {
     state.value = 'validation'
     return
   }
@@ -44,7 +48,7 @@ async function submitForm() {
     <h1 class="sign-in-form__title">Войти в аккаунт</h1>
     <p class="sign-in-form__subtitle">Продолжите работу над вашими встречами.</p>
     <StatusMessage v-if="state === 'server-error'" state="error">{{ errorMessage }}</StatusMessage>
-    <BaseInput v-model="email" class="sign-in-form__field" label="Рабочий email" type="email" autocomplete="email" placeholder="you@company.com" :error="state === 'validation' && !email.trim() ? 'Введите email.' : ''" />
+    <BaseInput v-model="email" class="sign-in-form__field" label="Рабочий email" type="email" autocomplete="email" placeholder="you@company.com" :error="emailError" />
     <BaseInput v-model="password" class="sign-in-form__field" label="Пароль" type="password" autocomplete="current-password" placeholder="Введите пароль" :error="state === 'validation' && password && !validatePassword(password).isValid ? 'Проверьте пароль.' : ''" />
     <RouterLink class="sign-in-form__forgot" :to="{ name: 'reset-password' }">Забыли пароль?</RouterLink>
     <BaseButton class="sign-in-form__submit" type="submit" :loading="state === 'submitting'">Войти</BaseButton>
