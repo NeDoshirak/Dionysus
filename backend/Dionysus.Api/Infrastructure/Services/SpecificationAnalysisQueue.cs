@@ -1,6 +1,8 @@
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 public sealed class SpecificationAnalysisQueue : ISpecificationAnalysisQueue
 {
@@ -16,8 +18,11 @@ public sealed class SpecificationAnalysisQueue : ISpecificationAnalysisQueue
 
 public sealed class SpecificationAnalysisWorker(
     IServiceScopeFactory scopeFactory,
-    ISpecificationAnalysisQueue queue) : BackgroundService
+    ISpecificationAnalysisQueue queue,
+    ILogger<SpecificationAnalysisWorker>? logger = null) : BackgroundService
 {
+    private readonly ILogger<SpecificationAnalysisWorker> _logger = logger ?? NullLogger<SpecificationAnalysisWorker>.Instance;
+
     public async Task<SpecificationAnalysisJob?> TryClaimAsync(SpecificationAnalysisJob job, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -86,6 +91,10 @@ public sealed class SpecificationAnalysisWorker(
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Specification analysis job {AnalysisId} failed.", claimedJob.AnalysisId);
             }
         }
     }

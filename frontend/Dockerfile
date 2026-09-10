@@ -1,6 +1,6 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json tsconfig.json vite.config.ts ./
+COPY package.json package-lock.json jsconfig.json vite.config.js ./
 RUN npm install
 COPY index.html ./
 COPY src ./src
