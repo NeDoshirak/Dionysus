@@ -38,14 +38,14 @@ const email = computed(() => route.query.email || '')
     h1
       margin: 20px 0 0
       font-size: 28px
-      line-height: 1.5
+      line-height: 34px
       letter-spacing: -.5px
 
     p:not(.auth-page__brand)
       margin: 10px 0 0
       color: var(--color-muted)
       font-size: 15px
-      line-height: 1.5
+      line-height: 22px
 
   &__brand
     margin: 0

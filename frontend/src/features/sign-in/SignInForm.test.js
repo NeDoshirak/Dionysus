@@ -19,6 +19,13 @@ it('shows an invalid credentials message', async () => {
   expect(wrapper.text()).toContain('Неверный email или пароль.')
 })
 
+it('uses the Figma sign-in heading and supporting copy', () => {
+  const wrapper = mount(SignInForm)
+
+  expect(wrapper.get('h1').text()).toBe('Войти в аккаунт')
+  expect(wrapper.get('.sign-in-form__subtitle').text()).toBe('Продолжите работу над вашими встречами.')
+})
+
 it('routes unconfirmed users to email verification with their email', async () => {
   const wrapper = mount(SignInForm)
 

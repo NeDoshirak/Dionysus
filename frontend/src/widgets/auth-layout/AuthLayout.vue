@@ -30,8 +30,9 @@
 
   &__image-placeholder
     display: grid
-    width: min(360px, 100%)
-    height: min(432px, 48vh)
+    width: 360px
+    max-width: 100%
+    height: 432px
     place-items: center
     border: 1px dashed rgba(255, 255, 255, .32)
     border-radius: 16px
@@ -48,13 +49,13 @@
     color: rgba(255, 255, 255, .85)
     font-size: 15px
     font-weight: 600
-    line-height: 1.5
+    line-height: 22px
 
   &__benefits
     margin: 8px 0 0
     color: rgba(255, 255, 255, .4)
     font-size: 13px
-    line-height: 1.6
+    line-height: 21px
 
   &__content
     display: grid

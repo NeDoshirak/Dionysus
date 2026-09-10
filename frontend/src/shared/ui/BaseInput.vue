@@ -40,17 +40,18 @@ const generatedId = useId()
   &__label
     font-size: 14px
     font-weight: 600
-    line-height: 1.5
+    line-height: 20px
 
   &__control
     width: 100%
-    min-height: 48px
-    padding: 11px 14px
+    min-height: 49px
+    height: 49px
+    padding: 12px 14px
     border: 1px solid var(--color-border)
     border-radius: 8px
     background: var(--color-surface)
     color: var(--color-text)
-    line-height: 1.5
+    line-height: 22px
 
     &:focus-visible
       outline: 3px solid var(--color-focus)
@@ -67,5 +68,5 @@ const generatedId = useId()
     margin: 0
     color: var(--color-danger)
     font-size: 14px
-    line-height: 1.5
+    line-height: 20px
 </style>

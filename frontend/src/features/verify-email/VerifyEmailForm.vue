@@ -114,14 +114,14 @@ async function submitForm() {
   &__title
     margin: 16px 0 0
     font-size: 28px
-    line-height: 1.5
+    line-height: 34px
     letter-spacing: -.5px
 
   &__subtitle
     margin: 6px 0 0
     color: var(--color-muted)
     font-size: 15px
-    line-height: 1.5
+    line-height: 22px
 
     strong
       display: block
@@ -129,12 +129,14 @@ async function submitForm() {
 
   &__digits
     display: grid
-    grid-template-columns: repeat(6, minmax(0, 1fr))
+    grid-template-columns: repeat(6, 52px)
     gap: 10px
     margin-top: 28px
+    margin-right: auto
+    margin-left: auto
 
   &__digit
-    width: 100%
+    width: 52px
     height: 60px
     border: 1px solid var(--color-border)
     border-radius: 10px
@@ -152,6 +154,7 @@ async function submitForm() {
     margin: 8px 0 0
     color: var(--color-danger)
     font-size: 14px
+    line-height: 20px
 
   &__resend
     margin: 8px 0 0
@@ -171,8 +174,4 @@ async function submitForm() {
       color: var(--color-accent-strong)
       font-weight: 600
 
-@media (max-width: 390px)
-  .verify-email-form
-    &__digits
-      gap: 6px
 </style>

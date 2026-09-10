@@ -80,13 +80,14 @@ async function submitForm() {
   &__title
     margin: 28px 0 0
     font-size: 28px
-    line-height: 1.5
+    line-height: 34px
     letter-spacing: -.5px
 
   &__subtitle
     margin: 6px 0 0
     color: var(--color-muted)
     font-size: 15px
+    line-height: 22px
 
   &__field
     margin-top: 28px
@@ -111,7 +112,7 @@ async function submitForm() {
     margin-top: 18px
     color: #374151
     font-size: 14px
-    line-height: 1.5
+    line-height: 21px
 
     input
       width: 18px

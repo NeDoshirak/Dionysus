@@ -15,6 +15,12 @@ it('connects an input to its label and error and emits entered values', async ()
   expect(wrapper.emitted('update:modelValue')).toEqual([['analyst@example.com']])
 })
 
+it('uses the compact Figma control sizing', () => {
+  const wrapper = mount(BaseInput, { props: { label: 'Email' } })
+
+  expect(wrapper.get('input').classes()).toContain('base-input__control')
+})
+
 it('gives each input a unique label association and forwards native attributes', () => {
   const wrapper = mount({ components: { BaseInput }, template: '<div><BaseInput label="Email" autocomplete="email" required /><BaseInput label="Password" type="password" /></div>' })
   const inputs = wrapper.findAll('input')

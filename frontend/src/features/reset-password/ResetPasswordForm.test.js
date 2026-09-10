@@ -25,5 +25,16 @@ it('starts a resend-code timer after requesting a reset code', async () => {
 it('preserves the requested email in the code step', async () => {
   const wrapper = mount(ResetPasswordForm, { props: { email: 'person@example.com', step: 'code' } })
 
-  expect(wrapper.text()).toContain('person@example.com')
+  expect(wrapper.text()).toContain('p***@example.com')
+  expect(wrapper.text()).not.toContain('person@example.com')
+  expect(wrapper.findAll('input[inputmode="numeric"]')).toHaveLength(6)
+  expect(wrapper.text()).toContain('Изменить email')
+})
+
+it('renders six accessible code cells with one-digit constraints', () => {
+  const wrapper = mount(ResetPasswordForm, { props: { email: 'person@example.com', step: 'code' } })
+  const cells = wrapper.findAll('input[inputmode="numeric"]')
+
+  expect(cells).toHaveLength(6)
+  expect(cells.every((cell) => cell.attributes('maxlength') === '1')).toBe(true)
 })
