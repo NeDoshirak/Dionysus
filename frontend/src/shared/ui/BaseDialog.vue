@@ -8,6 +8,8 @@ const props = defineProps({
 defineEmits(['close'])
 const dialog = ref(null)
 const titleId = useId()
+const isClosing = ref(false)
+let closeTimer
 
 function showDialog() {
   if (!dialog.value) return
@@ -21,9 +23,41 @@ function closeDialog() {
   else dialog.value.removeAttribute('open')
 }
 
+function clearCloseTimer() {
+  if (closeTimer) window.clearTimeout(closeTimer)
+  closeTimer = undefined
+}
+
+function finishClosing() {
+  clearCloseTimer()
+  isClosing.value = false
+  closeDialog()
+}
+
+function startClosing() {
+  if (!dialog.value?.open || isClosing.value) return
+
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    finishClosing()
+    return
+  }
+
+  isClosing.value = true
+  closeTimer = window.setTimeout(finishClosing, 220)
+}
+
+function onAnimationEnd(event) {
+  if (isClosing.value && event.animationName === 'base-dialog-fade-out') finishClosing()
+}
+
 watch(() => props.open, (open) => {
-  if (open && !dialog.value?.open) showDialog()
-  else if (!open && dialog.value?.open) closeDialog()
+  if (open) {
+    clearCloseTimer()
+    isClosing.value = false
+    if (!dialog.value?.open) showDialog()
+  } else if (dialog.value?.open) {
+    startClosing()
+  }
 }, { flush: 'post' })
 
 watch(dialog, (element) => {
@@ -31,6 +65,7 @@ watch(dialog, (element) => {
 })
 
 onBeforeUnmount(() => {
+  clearCloseTimer()
   if (dialog.value?.open) closeDialog()
 })
 </script>
@@ -39,8 +74,10 @@ onBeforeUnmount(() => {
   <dialog
     ref="dialog"
     class="base-dialog base-dialog--fade-in"
+    :class="{ 'base-dialog--closing': isClosing }"
     :aria-labelledby="titleId"
     @cancel.prevent="$emit('close')"
+    @animationend="onAnimationEnd"
   >
     <div class="base-dialog__header">
       <h2 :id="titleId" class="base-dialog__title">{{ title }}</h2>
@@ -66,6 +103,12 @@ onBeforeUnmount(() => {
   &::backdrop
     background: rgb(17 24 39 / 55%)
     animation: base-dialog-backdrop-fade-in 180ms ease-out
+
+  &--closing
+    animation: base-dialog-fade-out 180ms ease-in forwards
+
+    &::backdrop
+      animation: base-dialog-backdrop-fade-out 180ms ease-in forwards
 
   &__header
     display: flex
@@ -120,4 +163,18 @@ onBeforeUnmount(() => {
 
   to
     background: rgb(17 24 39 / 55%)
+
+@keyframes base-dialog-fade-out
+  from
+    opacity: 1
+
+  to
+    opacity: 0
+
+@keyframes base-dialog-backdrop-fade-out
+  from
+    background: rgb(17 24 39 / 55%)
+
+  to
+    background: transparent
 </style>

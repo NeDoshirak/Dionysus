@@ -76,3 +76,17 @@ it('marks the dialog for the opening fade animation', () => {
 
   expect(wrapper.get('dialog').classes()).toContain('base-dialog--fade-in')
 })
+
+it('keeps the dialog open until its closing fade finishes', async () => {
+  const wrapper = mount(BaseDialog, { props: { open: true, title: 'Новый проект' } })
+  const dialog = wrapper.get('dialog')
+
+  await wrapper.vm.$nextTick()
+  expect(dialog.attributes('open')).toBeDefined()
+  await wrapper.setProps({ open: false })
+
+  expect(dialog.classes()).toContain('base-dialog--closing')
+  expect(dialog.attributes('open')).toBeDefined()
+  await dialog.trigger('animationend', { animationName: 'base-dialog-fade-out' })
+  expect(dialog.attributes('open')).toBeUndefined()
+})
