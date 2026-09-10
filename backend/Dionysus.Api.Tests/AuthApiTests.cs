@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using System.Text.Json;
 using Xunit;
 
 public class AuthApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
@@ -124,6 +125,18 @@ public class AuthApiTests(WebApplicationFactory<Program> factory) : IClassFixtur
         Assert.Contains("/api/auth/password-reset/confirm", document);
         Assert.Contains("securitySchemes", document);
         Assert.Contains("Bearer", document);
+    }
+
+    [Fact]
+    public async Task Swagger_marks_only_protected_operations_with_security()
+    {
+        var document = JsonDocument.Parse(
+            await factory.CreateClient().GetStringAsync("/swagger/v1/swagger.json"));
+        var paths = document.RootElement.GetProperty("paths");
+
+        Assert.False(paths.GetProperty("/api/auth/login").GetProperty("post").TryGetProperty("security", out _));
+        Assert.True(paths.GetProperty("/api/auth/me").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
+        Assert.True(paths.GetProperty("/api/projects").GetProperty("get").GetProperty("security").GetArrayLength() > 0);
     }
 
     private static CodeService CreateCodeService()
