@@ -170,9 +170,10 @@ const steps = [
   &__photo
     position: absolute
     z-index: -2
-    inset: -2.5%
-    width: 105%
-    height: 105%
+    top: -7.27%
+    left: -7.27%
+    width: 114.55%
+    height: 114.55%
     object-fit: cover
     filter: blur(3px)
 
@@ -190,7 +191,7 @@ const steps = [
     display: inline-block
     margin: 0 0 20px
     padding: 4px 12px
-    border: 1px solid rgb(241 54 29 / 40%)
+    border: 1px solid rgba(241, 54, 29, .4)
     border-radius: 100px
     background: rgb(241 54 29 / 25%)
     color: #ffbcb4
@@ -210,9 +211,10 @@ const steps = [
   &__lead
     max-width: 540px
     margin: 20px auto 0
-    color: rgb(255 255 255 / 90%)
+    color: #fff
     font-size: 18px
     line-height: 1.7
+    opacity: .78
 
   &__hero-actions
     display: flex
@@ -222,7 +224,7 @@ const steps = [
     margin-top: 36px
 
   &__primary-action
-    padding: 15px 35px
+    padding: 16px 36px
     font-size: 18px
 
   &__section
@@ -252,15 +254,19 @@ const steps = [
     display: grid
     grid-template-columns: repeat(2, minmax(0, 1fr))
     gap: 20px
+    grid-auto-rows: 1fr
     margin: 48px 0 0
     padding: 0
     list-style: none
 
   &__capability
+    display: flex
+    flex-direction: column
+    height: 100%
     padding: 28px 24px
-    border: 1px solid var(--color-border)
+    border: 1px solid #e5e7eb
     border-radius: 12px
-    box-shadow: 0 1px 3px rgb(0 0 0 / 4%)
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .04)
 
   &__icon
     display: flex
