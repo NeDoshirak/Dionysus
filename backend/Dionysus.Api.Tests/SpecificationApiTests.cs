@@ -7,11 +7,20 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-public sealed class SpecificationApiTests
+public sealed class SpecificationApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
+    [Fact]
+    public async Task Unauthenticated_request_returns_unauthorized()
+    {
+        var response = await factory.CreateClient().GetAsync($"/api/projects/{Guid.NewGuid()}/specification");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task Other_user_gets_not_found_for_specification()
     {
@@ -75,6 +84,62 @@ public sealed class SpecificationApiTests
         var segment = Assert.Single(Assert.Single(details.Functions).Items).SourceSegments.Single();
         Assert.Equal(12.5, segment.StartSeconds);
         Assert.Equal(18.75, segment.EndSeconds);
+    }
+
+    [Fact]
+    public async Task Function_create_update_delete_requires_completed_analysis()
+    {
+        await using var db = CreateDb();
+        var project = SeedCompleted(db, "user-1");
+        var analysis = project.SpecificationAnalysis!;
+        var sourceStatementId = analysis.Statements.Single().Id;
+        analysis.Status = SpecificationAnalysisStatus.RunningStage0;
+        var controller = CreateController(db, "user-1", new RecordingQueue());
+
+        Assert.IsType<ConflictResult>(await controller.CreateFunction(project.Id,
+            new CreateSpecificationFunctionRequest("New function", "New description", 1, [sourceStatementId]), CancellationToken.None));
+        Assert.IsType<ConflictResult>(await controller.UpdateFunction(project.Id, analysis.Functions.Single().Id,
+            new UpdateSpecificationFunctionRequest("Updated", "Updated description", 2, null), CancellationToken.None));
+        Assert.IsType<ConflictResult>(await controller.DeleteFunction(project.Id, analysis.Functions.Single().Id, CancellationToken.None));
+
+        analysis.Status = SpecificationAnalysisStatus.Completed;
+        var created = Assert.IsType<CreatedAtActionResult>(await controller.CreateFunction(project.Id,
+            new CreateSpecificationFunctionRequest("New function", "New description", 1, [sourceStatementId]), CancellationToken.None));
+        var createdFunction = Assert.IsType<SpecificationFunctionDto>(created.Value);
+
+        var updated = Assert.IsType<OkObjectResult>(await controller.UpdateFunction(project.Id, createdFunction.Id,
+            new UpdateSpecificationFunctionRequest("Updated", "Updated description", 2, null), CancellationToken.None));
+        Assert.Equal("Updated", Assert.IsType<SpecificationFunctionDto>(updated.Value).Title);
+        Assert.IsType<NoContentResult>(await controller.DeleteFunction(project.Id, createdFunction.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Item_create_update_delete_requires_completed_analysis()
+    {
+        await using var db = CreateDb();
+        var project = SeedCompleted(db, "user-1");
+        var analysis = project.SpecificationAnalysis!;
+        var function = analysis.Functions.Single();
+        var item = function.Items.Single();
+        var sourceStatementId = analysis.Statements.Single().Id;
+        analysis.Status = SpecificationAnalysisStatus.RunningStage0;
+        var controller = CreateController(db, "user-1", new RecordingQueue());
+
+        Assert.IsType<ConflictResult>(await controller.CreateItem(project.Id, function.Id,
+            new CreateSpecificationItemRequest(SpecificationItemKind.Constraint, "New item", "New description", "high", [sourceStatementId]), CancellationToken.None));
+        Assert.IsType<ConflictResult>(await controller.UpdateItem(project.Id, function.Id, item.Id,
+            new UpdateSpecificationItemRequest("Updated", "Updated description", "low", null), CancellationToken.None));
+        Assert.IsType<ConflictResult>(await controller.DeleteItem(project.Id, function.Id, item.Id, CancellationToken.None));
+
+        analysis.Status = SpecificationAnalysisStatus.Completed;
+        var created = Assert.IsType<CreatedAtActionResult>(await controller.CreateItem(project.Id, function.Id,
+            new CreateSpecificationItemRequest(SpecificationItemKind.Constraint, "New item", "New description", "high", [sourceStatementId]), CancellationToken.None));
+        var createdItem = Assert.IsType<SpecificationItemDto>(created.Value);
+
+        var updated = Assert.IsType<OkObjectResult>(await controller.UpdateItem(project.Id, function.Id, createdItem.Id,
+            new UpdateSpecificationItemRequest("Updated", "Updated description", "low", null), CancellationToken.None));
+        Assert.Equal("Updated", Assert.IsType<SpecificationItemDto>(updated.Value).Title);
+        Assert.IsType<NoContentResult>(await controller.DeleteItem(project.Id, function.Id, createdItem.Id, CancellationToken.None));
     }
 
     private static AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
