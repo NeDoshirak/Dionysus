@@ -101,6 +101,304 @@ Backend валидирует, что все topic, statement и segment ID от�
 
 После завершения всех функций backend создаёт проектные `project_contradiction` items из relations типа `contradicts`. Они всегда расположены в конце ТЗ, содержат обе стороны противоречия, причину и ссылки на statements/таймкоды.
 
+## JSON-контракты AI-конвейера
+
+Все контракты используют `schemaVersion: "1.0"`. AI-ответ обязан быть единственным валидным JSON-объектом без Markdown и дополнительных полей. Backend десериализует ответы со строгой схемой: неизвестные поля, `null` в обязательных полях, невалидные enum-значения и нарушенные ID переводят анализ в `failed`.
+
+### Общие типы
+
+```json
+{
+  "segment": {
+    "id": "<guid TranscriptSegment>",
+    "startSeconds": 12.4,
+    "endSeconds": 18.9,
+    "text": "Текст сегмента"
+  },
+  "source": {
+    "sourceSegmentIds": ["<guid TranscriptSegment>"]
+  }
+}
+```
+
+`sourceSegmentIds` всегда непустой массив уникальных существующих segment IDs. Они принадлежат только текущей `VoiceRecording`. Backend не доверяет тексту и таймкодам, которые могут вернуть модели: таймкоды восстанавливаются только из БД по IDs.
+
+### Контракт этапа 0 — очистка транскрипции
+
+**Вход `Stage0CleanupRequest`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "segments": [
+    {
+      "id": "2e9a1111-1111-1111-1111-111111111111",
+      "startSeconds": 0.0,
+      "endSeconds": 4.2,
+      "text": "пользаватель дажен зайти по карпаративнай учётки"
+    }
+  ]
+}
+```
+
+**Выход `Stage0CleanupResponse`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "segments": [
+    {
+      "segmentId": "2e9a1111-1111-1111-1111-111111111111",
+      "cleanedText": "Пользователь должен войти по корпоративной учётной записи."
+    }
+  ]
+}
+```
+
+Инварианты: выходной набор `segmentId` в точности равен входному набору; каждый ID встречается один раз; `cleanedText` непустой. Модель не получает права менять IDs, временные границы, порядок или количество сегментов.
+
+### Контракт этапа 1 — извлечение контекста, тем и statements
+
+**Вход `Stage1ExtractionRequest`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "segments": [
+    {
+      "id": "2e9a1111-1111-1111-1111-111111111111",
+      "startSeconds": 0.0,
+      "endSeconds": 4.2,
+      "text": "Пользователь должен войти по корпоративной учётной записи."
+    }
+  ]
+}
+```
+
+Здесь `text` равен `CleanedText`, если он есть, иначе исходному `Text` Whisper.
+
+**Выход `Stage1ExtractionResponse`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "businessContext": [
+    {
+      "id": "ctx-1",
+      "text": "Система используется сотрудниками компании.",
+      "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+    }
+  ],
+  "topics": [
+    {
+      "id": "topic-1",
+      "name": "Авторизация",
+      "statements": [
+        {
+          "id": "st-1",
+          "text": "Пользователь должен иметь возможность войти с корпоративной учётной записью.",
+          "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+        },
+        {
+          "id": "st-2",
+          "text": "Корпоративная учётная запись используется для входа в систему.",
+          "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Допустимые форматы ID: `ctx-N`, `topic-N`, `st-N`, где `N` — положительное целое. IDs topics и statements уникальны в пределах ответа. В `businessContext` и `statements` запрещены пустые `sourceSegmentIds`. Этап не возвращает статусы, relations или финальные требования.
+
+### Контракт этапа 2 — ревью, дедупликация и противоречия
+
+**Вход `Stage2ReviewRequest`:** в точности валидный `Stage1ExtractionResponse`.
+
+**Выход `Stage2ReviewResponse`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "businessContext": [
+    {
+      "id": "ctx-1",
+      "text": "Система используется сотрудниками компании.",
+      "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+    }
+  ],
+  "topics": [
+    {
+      "id": "topic-1",
+      "name": "Авторизация",
+      "statementIds": ["st-1", "st-2"]
+    }
+  ],
+  "statements": [
+    {
+      "id": "st-1",
+      "text": "Пользователь должен иметь возможность войти с корпоративной учётной записью.",
+      "status": "active",
+      "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+    },
+    {
+      "id": "st-2",
+      "text": "Корпоративная учётная запись используется для входа в систему.",
+      "status": "active",
+      "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-1",
+      "type": "clarifies",
+      "sourceStatementIds": ["st-1"],
+      "targetStatementIds": ["st-2"],
+      "reason": "Второе утверждение уточняет способ входа."
+    }
+  ]
+}
+```
+
+`status` допускает только `active`, `superseded`, `unresolved`. `type` допускает только `same`, `clarifies`, `supersedes`, `contradicts`, `unresolved`, `related`.
+
+Валидатор требует, чтобы набор statements в ответе совпадал со входом по IDs, `text` и `sourceSegmentIds`; ни один statement не может исчезнуть или получить новые источники. Каждое `statementId` присутствует ровно в одной нормализованной теме. Topic IDs допускается переименовывать и объединять, но нельзя удалять statements. Все IDs relation должны ссылаться на существующие statements; `sourceStatementIds` и `targetStatementIds` непусты, уникальны и не пересекаются. Для `supersedes` старые statements обязаны иметь `superseded`, новые — `active`; для `contradicts` обе стороны остаются `active`.
+
+### Контракт этапа 3 — один функциональный блок ТЗ
+
+Для каждой темы backend формирует самостоятельный запрос. События business context передаются как общая информация, но не подменяют источники функциональных требований.
+
+**Вход `Stage3FunctionRequest`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "businessContext": [
+    {
+      "id": "ctx-1",
+      "text": "Система используется сотрудниками компании.",
+      "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+    }
+  ],
+  "function": {
+    "topicId": "topic-1",
+    "name": "Авторизация",
+    "statements": [
+      {
+        "id": "st-1",
+        "text": "Пользователь должен иметь возможность войти с корпоративной учётной записью.",
+        "status": "active",
+        "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+      },
+      {
+        "id": "st-2",
+        "text": "Корпоративная учётная запись используется для входа в систему.",
+        "status": "active",
+        "sourceSegmentIds": ["2e9a1111-1111-1111-1111-111111111111"]
+      }
+    ],
+    "relations": [
+      {
+        "id": "rel-1",
+        "type": "clarifies",
+        "sourceStatementIds": ["st-1"],
+        "targetStatementIds": ["st-2"],
+        "reason": "Второе утверждение уточняет способ входа."
+      }
+    ]
+  }
+}
+```
+
+**Выход `Stage3FunctionResponse`:**
+
+```json
+{
+  "schemaVersion": "1.0",
+  "function": {
+    "title": "Авторизация",
+    "description": "Вход сотрудников в систему.",
+    "sourceStatementIds": ["st-1"]
+  },
+  "roles": [],
+  "functionalRequirements": [
+    {
+      "id": "req-1",
+      "title": "Вход с корпоративной учётной записью",
+      "description": "Пользователь должен иметь возможность войти в систему с корпоративной учётной записью.",
+      "priority": "required",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "userScenarios": [],
+  "constraints": [],
+  "conditions": [],
+  "agreements": [],
+  "keyQuestions": []
+}
+```
+
+Все массивы обязательны и используют `[]`, если данных нет. Допустимые priority: `required`, `desirable`, `future`, `unknown`. Все AI-элементы, включая function, обязаны иметь непустой массив существующих `sourceStatementIds` только из входной функции. Форматы локальных IDs: `role-N`, `req-N`, `scenario-N`, `constraint-N`, `condition-N`, `agreement-N`, `question-N`.
+
+`keyQuestions` имеет поля `id`, `title`, `description`, `reason` и `sourceStatementIds`; `reason` допускает `contradiction`, `unresolved`, `missing_information`. Массив может быть пустым. Backend формирует `project_contradiction` items самостоятельно из `Stage2ReviewResponse.relations`, а не поручает модели повторно выводить противоречия на этапе 3.
+
+Точные формы остальных массивов `Stage3FunctionResponse`:
+
+```json
+{
+  "roles": [
+    {
+      "id": "role-1",
+      "name": "Сотрудник",
+      "description": "Пользователь системы.",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "userScenarios": [
+    {
+      "id": "scenario-1",
+      "title": "Вход в систему",
+      "actor": "Сотрудник",
+      "description": "Сотрудник входит с корпоративной учётной записью.",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "constraints": [
+    {
+      "id": "constraint-1",
+      "description": "Ограничение, указанное в разговоре.",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "conditions": [
+    {
+      "id": "condition-1",
+      "description": "Условие выполнения требования.",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "agreements": [
+    {
+      "id": "agreement-1",
+      "description": "Явно достигнутая договорённость.",
+      "sourceStatementIds": ["st-1"]
+    }
+  ],
+  "keyQuestions": [
+    {
+      "id": "question-1",
+      "title": "Вопрос по функции",
+      "description": "Что требуется уточнить.",
+      "reason": "unresolved",
+      "sourceStatementIds": ["st-1"]
+    }
+  ]
+}
+```
+
+Элементы каждого массива используют только указанные поля. `roles`, `userScenarios`, `constraints`, `conditions`, `agreements` и `keyQuestions` не принимают `priority`; это поле допустимо только у `functionalRequirements`.
+
 ## Ошибки и повтор
 
 Если Yandex AI возвращает сетевую ошибку, невалидный JSON, неизвестный ID, недопустимый статус или нарушает правила этапа, worker переводит анализ в `failed`, сохраняет безопасную диагностическую ошибку и не публикует частично сформированное финальное ТЗ.
