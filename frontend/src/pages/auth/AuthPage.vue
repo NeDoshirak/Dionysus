@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { SignUpForm } from '@/features/sign-up'
 import { VerifyEmailForm } from '@/features/verify-email'
 import { BaseButton } from '@/shared/ui'
-import AuthLayout from '@/widgets/auth-layout/AuthLayout.vue'
+import { AuthLayout } from '@/widgets/auth-layout'
 
 const route = useRoute()
 const email = computed(() => route.query.email || '')
