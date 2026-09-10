@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { BaseButton, BaseInput } from '@/shared/ui'
 
-const props = defineProps({ email: { type: String, default: 'alex@company.com' } })
+const props = defineProps({ email: { type: String, default: '' } })
 const email = ref(props.email)
 const currentPassword = ref('')
 const newPassword = ref('')

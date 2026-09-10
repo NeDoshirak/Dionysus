@@ -6,8 +6,8 @@ import { ProfileForm, SignOutButton } from '@/features/profile'
 import { AppHeader } from '@/widgets/app-header'
 
 const session = getSession()
-const email = session?.email || 'alex@company.com'
-const initials = computed(() => 'АИ')
+const email = session?.email || ''
+const initials = computed(() => email.charAt(0).toUpperCase() || '—')
 </script>
 
 <template>
@@ -16,7 +16,7 @@ const initials = computed(() => 'АИ')
     <main class="profile-page__main">
       <div class="profile-page__intro">
         <div class="profile-page__avatar">{{ initials }}</div>
-        <div><h1>Александр Иванов</h1><p>{{ email }}</p></div>
+        <div><h1>Профиль</h1><p>{{ email }}</p></div>
         <RouterLink class="profile-page__back" :to="{ name: 'projects' }">← Назад к проектам</RouterLink>
       </div>
       <ProfileForm :email="email" />
