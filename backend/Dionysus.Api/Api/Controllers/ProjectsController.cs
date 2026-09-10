@@ -116,6 +116,23 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
 
     private sealed record TranscriptionSearchCandidate(VoiceRecording Recording, TranscriptSegment Segment);
 
+    [HttpGet("{projectId:guid}/recordings/{recordingId:guid}/stream")]
+    public async Task<IActionResult> Stream(Guid projectId, Guid recordingId)
+    {
+        var recording = await db.VoiceRecordings
+            .AsNoTracking()
+            .Where(x => x.Id == recordingId && x.ProjectEntityId == projectId)
+            .Join(db.Projects.Where(x => x.OwnerId == User.FindFirstValue(ClaimTypes.NameIdentifier)),
+                recording => recording.ProjectEntityId,
+                project => project.Id,
+                (recording, _) => recording)
+            .FirstOrDefaultAsync();
+
+        return recording is null
+            ? NotFound()
+            : File(recording.AudioData, recording.ContentType, enableRangeProcessing: true);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id)
     {

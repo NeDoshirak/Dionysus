@@ -55,6 +55,7 @@ Refresh-токен хранится в `HttpOnly` cookie с `SameSite=Strict` и
 
 - `GET /api/projects/search?query=...` — нечёткий поиск проектов текущего пользователя по названию;
 - `GET /api/projects/{projectId}/transcription-search?query=...` — нечёткий поиск по сегментам транскрипции внутри одного проекта.
+- `GET /api/projects/{projectId}/recordings/{recordingId}/stream` — аудиопоток для проигрывателя с поддержкой Range-запросов.
 
 Обе ручки возвращают score релевантности и требуют access token. Поиск учитывает
 опечатки и похожие слова, а результаты сортируются от наиболее подходящих.
