@@ -51,7 +51,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
-using (var scope = app.Services.CreateScope()) { scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated(); }
+using (var scope = app.Services.CreateScope())
+{
+    var database = scope.ServiceProvider.GetRequiredService<AppDbContext>().Database;
+    database.EnsureCreated();
+    if (databaseUrl is not null) database.Migrate();
+}
 app.UseExceptionHandler();
 app.UseSwagger(); app.UseSwaggerUI();
 app.UseAuthentication(); app.UseAuthorization();

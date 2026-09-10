@@ -1,5 +1,4 @@
 # Dionysus
-# Dionysus
 
 Минимальный full-stack каркас: Vite + React frontend, ASP.NET Core 8 API, PostgreSQL и Whisper для распознавания речи.
 
@@ -15,7 +14,23 @@ docker compose up --build
 - API health: http://localhost:8000/health
 - Whisper: http://localhost:9000
 
-Распознавание: `POST /api/transcribe` с multipart-полем `file` и audio-файлом.
+Распознавание выполняется при создании проекта: `POST /api/projects` принимает
+`multipart/form-data` с полями `name` и `media`. Поддерживаются аудио и видео;
+для видео сохраняется только извлечённая аудиодорожка.
+
+В ответе `GET /api/projects/{id}` транскрипция содержит сегменты для таймлайна:
+
+```json
+{
+  "startSeconds": 12.4,
+  "endSeconds": 16.8,
+  "text": "текст сегмента"
+}
+```
+
+По умолчанию Compose использует модель `small`, движок `faster_whisper`, русский
+язык (`WHISPER_LANGUAGE=ru`) и VAD-фильтрацию. Для качества/скорости можно
+изменить `WHISPER_MODEL`, `WHISPER_ENGINE` и `WHISPER_LANGUAGE` в `.env`.
 
 ## CI/CD
 
