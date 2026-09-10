@@ -35,7 +35,7 @@
     height: 432px
     place-items: center
     border: 1px dashed rgba(255, 255, 255, .32)
-    border-radius: 16px
+    border-radius: var(--radius-lg)
     color: rgba(255, 255, 255, .48)
     font-size: 14px
 
@@ -61,15 +61,15 @@
     display: grid
     min-width: 0
     place-items: center
-    padding: 40px 24px
+    padding: var(--space-10) var(--space-6)
     background: radial-gradient(ellipse at 60% 40%, rgba(241, 54, 29, .1), transparent 44%), var(--color-background)
 
   &__card
     width: min(100%, 420px)
-    padding: 40px
-    border-radius: 16px
+    padding: var(--space-10)
+    border-radius: var(--radius-lg)
     background: var(--color-surface)
-    box-shadow: 0 4px 6px rgba(0, 0, 0, .08)
+    box-shadow: var(--shadow-card)
 
 @media (max-width: 760px)
   .auth-layout
@@ -77,7 +77,7 @@
 
     &__panel
       min-height: 205px
-      padding: 28px 24px
+      padding: var(--space-7) var(--space-6)
 
     &__image-placeholder
       display: none
@@ -87,8 +87,8 @@
 
     &__content
       min-height: calc(100vh - 205px)
-      padding: 24px 16px
+      padding: var(--space-6) var(--space-4)
 
     &__card
-      padding: 28px 20px
+      padding: var(--space-7) var(--space-5)
 </style>

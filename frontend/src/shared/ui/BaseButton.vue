@@ -36,7 +36,7 @@ defineProps({
   min-height: 48px
   padding: 11px 23px
   border: 1px solid transparent
-  border-radius: 8px
+  border-radius: var(--radius-sm)
   background: var(--color-accent-strong)
   color: var(--color-surface)
   font: inherit

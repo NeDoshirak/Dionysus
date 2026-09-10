@@ -68,7 +68,7 @@ const initials = computed(() => 'АИ')
     padding: 8px 14px
     border: 1px solid var(--color-border)
     border-radius: 8px
-    color: #374151
+    color: var(--color-text-secondary)
     font-size: 13px
 
   &__sign-out

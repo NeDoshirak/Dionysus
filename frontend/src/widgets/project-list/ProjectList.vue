@@ -55,7 +55,7 @@ defineProps({
     gap: 16px
     min-height: 68px
     padding: 14px 16px
-    border-bottom: 1px solid #f3f4f6
+    border-bottom: 1px solid var(--color-border-subtle)
     border-radius: 10px
     color: var(--color-text)
     text-decoration: none
@@ -68,7 +68,7 @@ defineProps({
     width: 52px
     height: 52px
     place-items: center
-    border-radius: 12px
+    border-radius: var(--radius-md)
     background: var(--color-accent-soft)
     color: var(--color-accent)
 
@@ -86,7 +86,7 @@ defineProps({
       white-space: nowrap
 
     small
-      color: #9ca3af
+      color: var(--color-subtle)
       font-size: 13px
 
   &__status

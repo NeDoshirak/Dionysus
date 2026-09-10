@@ -1,5 +1,7 @@
 export { default as BaseButton } from './BaseButton.vue'
+export { default as AuthFormFrame } from './AuthFormFrame.vue'
 export { default as BaseInput } from './BaseInput.vue'
+export { default as CodeInput } from './CodeInput.vue'
 export { default as BaseDialog } from './BaseDialog.vue'
 export { default as StatusMessage } from './StatusMessage.vue'
 export { default as FileDropzone } from './FileDropzone.vue'

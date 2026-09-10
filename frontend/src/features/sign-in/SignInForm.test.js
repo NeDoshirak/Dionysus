@@ -23,7 +23,7 @@ it('uses the Figma sign-in heading and supporting copy', () => {
   const wrapper = mount(SignInForm)
 
   expect(wrapper.get('h1').text()).toBe('Войти в аккаунт')
-  expect(wrapper.get('.sign-in-form__subtitle').text()).toBe('Продолжите работу над вашими встречами.')
+  expect(wrapper.get('.auth-form-frame__subtitle').text()).toBe('Продолжите работу над вашими встречами.')
 })
 
 it('routes unconfirmed users to email verification with their email', async () => {

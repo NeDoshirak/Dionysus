@@ -29,6 +29,22 @@ it('gives each input a unique label association and forwards native attributes',
   expect(inputs[0].attributes('required')).toBeDefined()
 })
 
+it('renders a trailing control within the input field', () => {
+  const wrapper = mount(BaseInput, {
+    props: { label: 'Пароль', type: 'password' },
+    slots: { trailing: '<button class="password-toggle" type="button">Показать</button>' },
+  })
+
+  expect(wrapper.get('.base-input__trailing .password-toggle').text()).toBe('Показать')
+})
+
+it('applies consumer layout classes to the field root instead of the native control', () => {
+  const wrapper = mount(BaseInput, { props: { label: 'Email' }, attrs: { class: 'form__field' } })
+
+  expect(wrapper.classes()).toContain('form__field')
+  expect(wrapper.get('input').classes()).not.toContain('form__field')
+})
+
 it('prevents duplicate actions while a button is loading', async () => {
   const wrapper = mount(BaseButton, { props: { loading: true }, slots: { default: 'Сохранить' } })
   expect(wrapper.get('button').attributes('disabled')).toBeDefined()

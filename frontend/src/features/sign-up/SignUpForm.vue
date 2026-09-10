@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { signUp } from '@/entities/session'
 import { validatePassword } from '@/shared/lib/validation'
-import { BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
+import { AuthFormFrame, BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
 
 const router = useRouter()
 const email = ref('')
@@ -40,16 +40,23 @@ async function submitForm() {
 </script>
 
 <template>
-  <form class="sign-up-form" novalidate @submit.prevent="submitForm">
-    <p class="sign-up-form__brand">SpecScribe</p>
-    <h1 class="sign-up-form__title">Создать аккаунт</h1>
-    <p class="sign-up-form__subtitle">Бесплатно. Без кредитной карты.</p>
+  <AuthFormFrame class="sign-up-form" title="Создать аккаунт" subtitle="Бесплатно. Без кредитной карты." @submit="submitForm">
     <StatusMessage v-if="state === 'server-error'" state="error">{{ serverError }}</StatusMessage>
     <StatusMessage v-if="state === 'success'" state="success">Аккаунт создан. Проверьте email.</StatusMessage>
-    <BaseInput v-model="email" class="sign-up-form__field" label="Рабочий email" type="email" autocomplete="email" placeholder="you@company.com" :error="state === 'validation' && !email ? 'Введите email.' : ''" />
-    <div class="sign-up-form__password">
-      <BaseInput v-model="password" label="Пароль" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="Минимум 8 символов" :error="passwordError" />
-      <button class="sign-up-form__password-toggle" type="button" @click="showPassword = !showPassword">{{ showPassword ? 'Скрыть' : 'Показать' }}</button>
+    <div class="sign-up-form__fields">
+      <BaseInput v-model="email" label="Рабочий email" type="email" autocomplete="email" placeholder="you@company.com" :error="state === 'validation' && !email ? 'Введите email.' : ''" />
+      <BaseInput
+        v-model="password"
+        label="Пароль"
+        :type="showPassword ? 'text' : 'password'"
+        autocomplete="new-password"
+        placeholder="Минимум 8 символов"
+        :error="passwordError"
+      >
+        <template #trailing>
+          <button class="sign-up-form__password-toggle" type="button" :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'" @click="showPassword = !showPassword">{{ showPassword ? 'Скрыть' : 'Показать' }}</button>
+        </template>
+      </BaseInput>
     </div>
     <label class="sign-up-form__terms">
       <input v-model="termsAccepted" type="checkbox">
@@ -57,49 +64,18 @@ async function submitForm() {
     </label>
     <p v-if="state === 'validation' && !termsAccepted" class="sign-up-form__validation" role="alert">Примите условия использования.</p>
     <BaseButton class="sign-up-form__submit" type="submit" :loading="state === 'submitting'">Создать аккаунт</BaseButton>
-    <p class="sign-up-form__footer">Уже есть аккаунт? <RouterLink :to="{ name: 'sign-in' }">Войти</RouterLink></p>
-  </form>
+    <template #footer>Уже есть аккаунт? <RouterLink :to="{ name: 'sign-in' }">Войти</RouterLink></template>
+  </AuthFormFrame>
 </template>
 
 <style scoped lang="sass">
 .sign-up-form
-  display: grid
-  width: min(100%, 381px)
-  margin: 0 auto
-
-  &__brand, &__title, &__subtitle, &__footer
-    text-align: center
-
-  &__brand
-    margin: 0
-    color: var(--color-accent)
-    font-size: 22px
-    font-weight: 700
-    letter-spacing: -.5px
-
-  &__title
-    margin: 28px 0 0
-    font-size: 28px
-    line-height: 34px
-    letter-spacing: -.5px
-
-  &__subtitle
-    margin: 6px 0 0
-    color: var(--color-muted)
-    font-size: 15px
-    line-height: 22px
-
-  &__field
-    margin-top: 28px
-
-  &__password
-    position: relative
-    margin-top: 18px
+  &__fields
+    display: grid
+    gap: 18px
+    margin-top: var(--space-7)
 
   &__password-toggle
-    position: absolute
-    right: 10px
-    top: 34px
     border: 0
     background: transparent
     color: var(--color-accent-strong)
@@ -110,7 +86,7 @@ async function submitForm() {
     display: flex
     gap: 8px
     margin-top: 18px
-    color: #374151
+    color: var(--color-text-secondary)
     font-size: 14px
     line-height: 21px
 
@@ -133,12 +109,4 @@ async function submitForm() {
     width: 100%
     margin-top: 20px
 
-  &__footer
-    margin: 20px 0 0
-    color: var(--color-muted)
-    font-size: 14px
-
-    a
-      color: var(--color-accent-strong)
-      font-weight: 600
 </style>

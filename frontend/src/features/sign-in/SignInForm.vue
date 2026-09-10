@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { setSession } from '@/entities/session'
 import { signInLocal } from '@/shared/api/local-adapters'
 import { validateEmail, validatePassword } from '@/shared/lib/validation'
-import { BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
+import { AuthFormFrame, BaseButton, BaseInput, StatusMessage } from '@/shared/ui'
 
 const router = useRouter()
 const email = ref('')
@@ -43,45 +43,18 @@ async function submitForm() {
 </script>
 
 <template>
-  <form class="sign-in-form" novalidate @submit.prevent="submitForm">
-    <p class="sign-in-form__brand">SpecScribe</p>
-    <h1 class="sign-in-form__title">Войти в аккаунт</h1>
-    <p class="sign-in-form__subtitle">Продолжите работу над вашими встречами.</p>
+  <AuthFormFrame class="sign-in-form" title="Войти в аккаунт" subtitle="Продолжите работу над вашими встречами." @submit="submitForm">
     <StatusMessage v-if="state === 'server-error'" state="error">{{ errorMessage }}</StatusMessage>
     <BaseInput v-model="email" class="sign-in-form__field" label="Рабочий email" type="email" autocomplete="email" placeholder="you@company.com" :error="emailError" />
     <BaseInput v-model="password" class="sign-in-form__field" label="Пароль" type="password" autocomplete="current-password" placeholder="Введите пароль" :error="state === 'validation' && password && !validatePassword(password).isValid ? 'Проверьте пароль.' : ''" />
     <RouterLink class="sign-in-form__forgot" :to="{ name: 'reset-password' }">Забыли пароль?</RouterLink>
     <BaseButton class="sign-in-form__submit" type="submit" :loading="state === 'submitting'">Войти</BaseButton>
-    <p class="sign-in-form__footer">Нет аккаунта? <RouterLink :to="{ name: 'sign-up' }">Зарегистрироваться</RouterLink></p>
-  </form>
+    <template #footer>Нет аккаунта? <RouterLink :to="{ name: 'sign-up' }">Зарегистрироваться</RouterLink></template>
+  </AuthFormFrame>
 </template>
 
 <style scoped lang="sass">
 .sign-in-form
-  display: grid
-  width: min(100%, 381px)
-  margin: 0 auto
-
-  &__brand, &__title, &__subtitle, &__footer
-    text-align: center
-
-  &__brand
-    margin: 0
-    color: var(--color-accent)
-    font-size: 22px
-    font-weight: 700
-
-  &__title
-    margin: 28px 0 0
-    font-size: 28px
-    line-height: 34px
-
-  &__subtitle
-    margin: 6px 0 0
-    color: var(--color-muted)
-    font-size: 15px
-    line-height: 22px
-
   &__field
     margin-top: 20px
 
@@ -96,12 +69,4 @@ async function submitForm() {
     width: 100%
     margin-top: 20px
 
-  &__footer
-    margin: 20px 0 0
-    color: var(--color-muted)
-    font-size: 14px
-
-    a
-      color: var(--color-accent-strong)
-      font-weight: 600
 </style>

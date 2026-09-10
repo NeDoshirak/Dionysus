@@ -331,14 +331,14 @@ const steps = [
     display: flex
     flex-wrap: wrap
     gap: 12px 24px
-    color: #9ca3af
+    color: var(--color-subtle)
     font-size: 14px
     line-height: 1.5
 
   &__copyright
     flex-shrink: 0
     margin: 0
-    color: #9ca3af
+    color: var(--color-subtle)
     font-size: 14px
     line-height: 1.5
 

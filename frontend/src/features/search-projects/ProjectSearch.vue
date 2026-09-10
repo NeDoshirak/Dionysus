@@ -59,8 +59,8 @@ watch(query, runSearch)
 
   &__icon
     position: absolute
-    top: 9px
-    left: 12px
+    top: 2px
+    left: 14px
     color: var(--color-muted)
     font-size: 21px
 
@@ -73,6 +73,7 @@ watch(query, runSearch)
     font: inherit
 
   &__state
+    position: absolute
     margin: 8px 0 0
     color: var(--color-muted)
     font-size: 12px

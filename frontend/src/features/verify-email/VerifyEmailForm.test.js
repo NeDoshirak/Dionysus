@@ -18,8 +18,8 @@ it('requires all six code digits before verification can be submitted', async ()
 it('masks the displayed verification email while retaining the email prop', () => {
   const wrapper = mount(VerifyEmailForm, { props: { email: 'person@example.com' } })
 
-  expect(wrapper.get('.verify-email-form__subtitle').text()).toContain('p***@example.com')
-  expect(wrapper.get('.verify-email-form__subtitle').text()).not.toContain('person@example.com')
+  expect(wrapper.get('.verify-email-form__email').text()).toContain('p***@example.com')
+  expect(wrapper.get('.verify-email-form__email').text()).not.toContain('person@example.com')
   expect(wrapper.props('email')).toBe('person@example.com')
 })
 

@@ -7,6 +7,7 @@ import { ProjectSearch } from '@/features/search-projects'
 import { CreateProjectDialog } from '@/features/create-project'
 import { getProjects } from '@/entities/project'
 import { BaseButton } from '@/shared/ui'
+import plusIcon from '@/shared/assets/icons/plus.svg'
 
 const router = useRouter()
 const projects = ref([])
@@ -60,7 +61,10 @@ onMounted(loadProjects)
         <h1>Мои проекты</h1>
         <div class="projects-page__actions">
           <ProjectSearch @results="updateResults" />
-          <BaseButton @click="createDialogOpen = true">Новый проект</BaseButton>
+          <BaseButton class="projects-page__create-button" aria-label="Новый проект" @click="createDialogOpen = true">
+            <img :src="plusIcon" alt="" aria-hidden="true">
+            <span class="visually-hidden">Новый проект</span>
+          </BaseButton>
         </div>
       </div>
       <p class="projects-page__eyebrow">{{ showingSearchResults ? 'Результаты поиска' : 'Недавние проекты' }}</p>
@@ -91,6 +95,19 @@ onMounted(loadProjects)
     align-items: center
     gap: 12px
 
+  &__create-button
+    width: 36px
+    min-width: 36px
+    min-height: 36px
+    height: 36px
+    padding: 0
+    border-radius: 50%
+    box-shadow: 0 2px 4px rgba(241, 54, 29, .3)
+
+    img
+      width: 18px
+      height: 18px
+
   h1
     margin: 0
     color: var(--color-text)
@@ -98,7 +115,7 @@ onMounted(loadProjects)
 
   &__eyebrow
     margin: 32px 0 8px
-    color: #9ca3af
+    color: var(--color-subtle)
     font-size: 12px
     font-weight: 600
     letter-spacing: .8px

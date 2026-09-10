@@ -54,9 +54,9 @@ onBeforeUnmount(() => {
 .base-dialog
   width: min(560px, calc(100% - 32px))
   max-height: calc(100dvh - 32px)
-  padding: 28px
+  padding: var(--space-7)
   border: 1px solid var(--color-border)
-  border-radius: 16px
+  border-radius: var(--radius-lg)
   background: var(--color-surface)
   color: var(--color-text)
   box-shadow: 0 24px 80px rgb(17 24 39 / 20%)
@@ -83,7 +83,7 @@ onBeforeUnmount(() => {
     height: 44px
     padding: 0
     border: 0
-    border-radius: 8px
+    border-radius: var(--radius-sm)
     background: var(--color-background)
     color: var(--color-muted)
     font-size: 28px
@@ -99,5 +99,5 @@ onBeforeUnmount(() => {
 
 @media (max-width: 480px)
   .base-dialog
-    padding: 20px
+    padding: var(--space-5)
 </style>

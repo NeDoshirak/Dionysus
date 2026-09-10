@@ -15,7 +15,7 @@ defineProps({ state: { type: String, default: 'info' } })
 .status-message
   padding: 12px 16px
   border: 1px solid var(--color-border)
-  border-radius: 8px
+  border-radius: var(--radius-sm)
   background: var(--color-background)
   color: var(--color-muted)
   font-size: 14px

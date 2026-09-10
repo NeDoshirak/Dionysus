@@ -54,12 +54,12 @@ function savePassword() {
   &__section
     overflow: hidden
     border: 1px solid var(--color-border)
-    border-radius: 12px
+    border-radius: var(--radius-md)
     background: var(--color-surface)
 
   &__heading
     padding: 18px 24px
-    border-bottom: 1px solid #f3f4f6
+    border-bottom: 1px solid var(--color-border-subtle)
 
     h2
       margin: 0
@@ -68,7 +68,7 @@ function savePassword() {
   &__content
     display: grid
     gap: 20px
-    padding: 20px 24px
+    padding: var(--space-5) var(--space-6)
 
     &--password
       gap: 18px
@@ -82,7 +82,7 @@ function savePassword() {
 
     p, &--end p
       margin: 0
-      color: #9ca3af
+      color: var(--color-subtle)
       font-size: 12px
 
     &--end
