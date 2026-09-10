@@ -1,11 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import AppHeader from '@/widgets/app-header/AppHeader.vue'
-import ProjectList from '@/widgets/project-list/ProjectList.vue'
-import ProjectSearch from '@/features/search-projects/ProjectSearch.vue'
+import { AppHeader } from '@/widgets/app-header'
+import { ProjectList } from '@/widgets/project-list'
+import { ProjectSearch } from '@/features/search-projects'
 import { getProjects } from '@/entities/project'
 
 const projects = ref([])
+const baseProjects = ref([])
 const loading = ref(true)
 const error = ref('')
 const showingSearchResults = ref(false)
@@ -14,7 +15,9 @@ async function loadProjects() {
   loading.value = true
   error.value = ''
   try {
-    projects.value = await getProjects()
+    const loadedProjects = await getProjects()
+    baseProjects.value = loadedProjects
+    projects.value = loadedProjects
   } catch {
     error.value = 'Не удалось загрузить проекты'
   } finally {
@@ -24,7 +27,7 @@ async function loadProjects() {
 
 function updateResults(results) {
   showingSearchResults.value = results.length > 0
-  if (results.length) projects.value = results
+  projects.value = results.length ? results : baseProjects.value
 }
 
 onMounted(loadProjects)

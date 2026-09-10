@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { expect, it, vi } from 'vitest'
-import ProjectSearch from './ProjectSearch.vue'
+import { ProjectSearch } from './index'
 
 it('does not search until the query contains two characters', async () => {
   const search = vi.fn().mockResolvedValue([])

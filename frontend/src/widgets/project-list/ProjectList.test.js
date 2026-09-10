@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import ProjectList from './ProjectList.vue'
+import { ProjectList } from './index'
 
 it('shows loading state while projects are loading', () => {
   const wrapper = mount(ProjectList, { props: { loading: true, projects: [] } })
