@@ -2,6 +2,7 @@ public record Credentials(string Email, string Password);
 public record CodeRequest(string Email, string Code);
 public record ResetRequest(string Email);
 public record ResetConfirm(string Email, string Code, string NewPassword);
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record TokenResponse(string AccessToken, DateTimeOffset ExpiresAt);
 public record TranscriptionSegmentDto(double StartSeconds, double EndSeconds, string Text);
 public record RecordingDetailsDto(Guid Id, string FileName, string ContentType, string SourceType, long SizeBytes, string Status, string? Error, string? Transcript, string? Language, IReadOnlyList<TranscriptionSegmentDto> Segments);

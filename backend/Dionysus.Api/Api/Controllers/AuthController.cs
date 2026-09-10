@@ -88,6 +88,20 @@ public sealed class AuthController(UserManager<AppUser> users, CodeService codes
         return NoContent();
     }
 
+    [HttpPost("change-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        var user = await users.FindByIdAsync(userId);
+        if (user is null) return Unauthorized();
+
+        var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        return result.Succeeded ? NoContent() : BadRequest(result.Errors);
+    }
+
     [HttpGet("me")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     public IActionResult Me() => Ok(new

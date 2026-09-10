@@ -43,6 +43,7 @@ CI запускается на push и pull request. Для deploy нужны se
 - `POST /api/auth/register` — регистрация и письмо с кодом;
 - `POST /api/auth/verify-email` — подтверждение кода и выдача токена;
 - `POST /api/auth/login`, `/refresh`, `/logout`;
+- `POST /api/auth/change-password` — смена пароля по текущему и новому паролю;
 - `POST /api/auth/password-reset/request` и `/confirm`;
 - `GET /api/auth/me` с `Authorization: Bearer <access-token>`.
 

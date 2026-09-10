@@ -125,6 +125,29 @@ public class AuthApiTests(WebApplicationFactory<Program> factory) : IClassFixtur
         Assert.Contains("/api/auth/password-reset/confirm", document);
         Assert.Contains("securitySchemes", document);
         Assert.Contains("Bearer", document);
+        Assert.Contains("/api/auth/change-password", document);
+    }
+
+    [Fact]
+    public void Me_response_contract_contains_email()
+    {
+        var controller = new AuthController(null!, null!, null!, null!, new TestHostEnvironment())
+        {
+            ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                    [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Email, "user@example.com")],
+                    "test"))
+                }
+            }
+        };
+
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(controller.Me());
+        var email = result.Value!.GetType().GetProperty("Email")!.GetValue(result.Value);
+
+        Assert.Equal("user@example.com", email);
     }
 
     [Fact]
