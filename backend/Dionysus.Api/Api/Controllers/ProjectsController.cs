@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 [ApiController]
 [Authorize]
 [Route("api/projects")]
-public sealed class ProjectsController(AppDbContext db, IMediaConverter media, ITranscriptionService transcription, ISpecificationAnalysisQueue queue) : ControllerBase
+public sealed class ProjectsController(AppDbContext db, ITranscriptionQueue transcriptionQueue) : ControllerBase
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -20,36 +20,11 @@ public sealed class ProjectsController(AppDbContext db, IMediaConverter media, I
         if (!type.StartsWith("audio/") && !type.StartsWith("video/")) return BadRequest(new { detail = "Only audio or video is supported" });
         using var stream = new MemoryStream(); await mediaFile.CopyToAsync(stream, ct);
         var sourceType = type.StartsWith("video/") ? "video" : "audio";
-        byte[] audio;
-        try { audio = sourceType == "video" ? await media.ExtractAudioAsync(stream.ToArray(), Path.GetExtension(mediaFile.FileName), ct) : stream.ToArray(); }
-        catch (Exception ex) { return Problem(ex.Message, statusCode: 422); }
         var project = new ProjectEntity { OwnerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!, Name = name.Trim() };
-        var recording = new VoiceRecording { ProjectEntityId = project.Id, FileName = sourceType == "video" ? Path.ChangeExtension(mediaFile.FileName, ".wav") : mediaFile.FileName, ContentType = sourceType == "video" ? "audio/wav" : type, SourceType = sourceType, SizeBytes = audio.LongLength, AudioData = audio, IsCurrent = true };
+        var recording = new VoiceRecording { ProjectEntityId = project.Id, FileName = mediaFile.FileName, ContentType = type, SourceType = sourceType, SizeBytes = stream.Length, AudioData = stream.ToArray(), IsCurrent = true };
         project.Recordings.Add(recording); db.Projects.Add(project); await db.SaveChangesAsync(ct);
-        try
-        {
-            var result = await transcription.TranscribeAsync(audio, recording.FileName, ct);
-            recording.Transcript = result.Text;
-            recording.Language = result.Language;
-            recording.Segments = result.Segments.Select(segment => new TranscriptSegment
-            {
-                VoiceRecordingId = recording.Id,
-                StartSeconds = segment.StartSeconds,
-                EndSeconds = segment.EndSeconds,
-                Text = segment.Text
-            }).ToList();
-            db.TranscriptSegments.AddRange(recording.Segments);
-            recording.Status = "completed";
-            await db.SaveChangesAsync(ct);
-            var analysis = new SpecificationAnalysis { ProjectEntityId = project.Id, Project = project };
-            project.SpecificationAnalysis = analysis;
-            db.SpecificationAnalyses.Add(analysis);
-            await db.SaveChangesAsync(ct);
-            try { await queue.EnqueueAsync(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), ct); }
-            catch { }
-            return CreatedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
-        }
-        catch (Exception) { recording.Status = "failed"; recording.Error = "Transcription failed."; await db.SaveChangesAsync(ct); return Problem("Transcription failed.", statusCode: 502); }
+        await transcriptionQueue.EnqueueAsync(new TranscriptionJob(recording.Id), ct);
+        return AcceptedAtAction(nameof(Get), new { id = project.Id }, ToDetails(project));
     }
     [HttpGet]
     public async Task<List<ProjectSummaryDto>> List()

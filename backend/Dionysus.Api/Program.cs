@@ -30,7 +30,9 @@ builder.Services.AddScoped<ISpecificationContractValidator, SpecificationContrac
 builder.Services.AddScoped<ISpecificationPromptFactory, SpecificationPromptFactory>();
 builder.Services.AddScoped<IStructuredSpecificationAiService, StructuredYandexAiService>();
 builder.Services.AddScoped<ISpecificationAnalysisOrchestrator, SpecificationOrchestrator>();
+builder.Services.AddSingleton<ITranscriptionQueue, TranscriptionQueue>();
 builder.Services.AddSingleton<ISpecificationAnalysisQueue, SpecificationAnalysisQueue>();
+builder.Services.AddHostedService<TranscriptionWorker>();
 builder.Services.AddHostedService<SpecificationAnalysisWorker>();
 builder.Services.AddHttpClient("whisper", client => { client.BaseAddress = new Uri(builder.Configuration["WHISPER_URL"] ?? "http://localhost:9000"); client.Timeout = TimeSpan.FromMinutes(5); });
 builder.Services.AddHttpClient("yandex-ai", client => { client.BaseAddress = new Uri("https://ai.api.cloud.yandex.net/"); client.Timeout = TimeSpan.FromMinutes(2); });
