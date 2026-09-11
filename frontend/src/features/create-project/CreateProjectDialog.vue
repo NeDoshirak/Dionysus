@@ -77,7 +77,7 @@ async function submit() {
       />
       <p v-if="media" class="create-project-dialog__file" data-testid="selected-file">Выбран файл: <strong>{{ media.name }}</strong></p>
       <StatusMessage v-if="fileError" state="error">{{ fileError }}</StatusMessage>
-      <StatusMessage v-if="state === 'success'" state="success">Проект создан</StatusMessage>
+      <StatusMessage v-if="state === 'success'" state="success">Проект создан, запись обрабатывается</StatusMessage>
       <div class="create-project-dialog__actions">
         <BaseButton type="button" variant="outline" :disabled="state === 'submitting'" @click="emit('close')">Отмена</BaseButton>
         <BaseButton type="submit" :loading="state === 'submitting'">{{ state === 'submitting' ? 'Создание…' : 'Создать проект' }}</BaseButton>

@@ -78,29 +78,36 @@ async function loadWorkspace() {
   error.value = null
   errorSource.value = ''
 
-  const [projectResult, specificationResult] = await Promise.allSettled([
-    getProject(projectId),
-    getSpecification(projectId),
-  ])
+  try {
+    project.value = await getProject(projectId)
+  } catch (reason) {
+    if (requestId !== loadRequestId || projectId !== getProjectId()) return
+    project.value = null
+    specification.value = null
+    error.value = reason
+    errorSource.value = 'project'
+    loading.value = false
+    scheduleRefresh()
+    return
+  }
 
   if (requestId !== loadRequestId || projectId !== getProjectId()) return
 
-  if (projectResult.status === 'fulfilled') {
-    project.value = projectResult.value
-  } else {
-    project.value = null
-    error.value = projectResult.reason
-    errorSource.value = 'project'
+  const currentRecording = project.value?.recordings?.at(-1)
+  if (currentRecording?.status === 'processing' || currentRecording?.status === 'failed') {
+    specification.value = null
+    loading.value = false
+    scheduleRefresh()
+    return
   }
 
-  if (specificationResult.status === 'fulfilled') {
-    specification.value = specificationResult.value
-  } else {
+  try {
+    specification.value = await getSpecification(projectId)
+  } catch (reason) {
+    if (requestId !== loadRequestId || projectId !== getProjectId()) return
     specification.value = null
-    if (projectResult.status === 'fulfilled') {
-      error.value = specificationResult.reason
-      errorSource.value = 'specification'
-    }
+    error.value = reason
+    errorSource.value = 'specification'
   }
 
   loading.value = false
