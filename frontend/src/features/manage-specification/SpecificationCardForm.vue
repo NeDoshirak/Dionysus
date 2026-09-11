@@ -61,7 +61,7 @@ function submit() {
   const body = {
     title: title.value.trim(),
     description: description.value.trim(),
-    sourceStatementIds: props.item?.sourceStatementIds ? [...props.item.sourceStatementIds] : [],
+    sourceStatementIds: isEdit.value && props.item?.sourceStatementIds ? [...props.item.sourceStatementIds] : [],
   }
 
   if (!isEdit.value) body.kind = kind.value
