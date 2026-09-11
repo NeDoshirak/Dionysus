@@ -85,7 +85,7 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         db.Projects.Add(project);
         await db.SaveChangesAsync();
 
-        var controller = new ProjectsController(db, null!, null!, null!)
+        var controller = new ProjectsController(db, null!)
         {
             ControllerContext = new ControllerContext
             {
@@ -105,46 +105,25 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
     }
 
     [Fact]
-    public async Task Create_project_persists_and_queues_specification_analysis_after_transcription()
+    public async Task Create_project_returns_accepted_and_queues_processing_recording()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         await using var db = new AppDbContext(options);
-        var queue = new RecordingQueue();
-        var controller = CreateController(db, new SuccessfulTranscription(), queue);
+        var transcriptionQueue = new RecordingTranscriptionQueue();
+        var controller = CreateController(db, transcriptionQueue);
 
         var result = await controller.Create(CreateRequest(), CancellationToken.None);
 
-        var created = Assert.IsType<CreatedAtActionResult>(result);
-        var details = Assert.IsType<ProjectDetailsDto>(created.Value);
-        var analysis = await db.SpecificationAnalyses.SingleAsync();
+        var accepted = Assert.IsType<AcceptedAtActionResult>(result);
+        var details = Assert.IsType<ProjectDetailsDto>(accepted.Value);
         var recording = await db.VoiceRecordings.SingleAsync();
-        Assert.Equal(SpecificationAnalysisStatus.Queued.ToString(), details.SpecificationStatus);
-        Assert.DoesNotContain("Stage0RawResponse", System.Text.Json.JsonSerializer.Serialize(details));
+        Assert.Equal(nameof(ProjectsController.Get), accepted.ActionName);
+        Assert.Equal("processing", Assert.Single(details.Recordings).Status);
         Assert.True(recording.IsCurrent);
-        Assert.Equal(SpecificationAnalysisStatus.Queued, analysis.Status);
-        Assert.Equal(new SpecificationAnalysisJob(analysis.Id, analysis.RunId), Assert.Single(queue.Jobs));
-    }
-
-    [Fact]
-    public async Task Create_project_does_not_create_analysis_when_transcription_fails()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        await using var db = new AppDbContext(options);
-        var queue = new RecordingQueue();
-        var controller = CreateController(db, new FailedTranscription(), queue);
-
-        var result = await controller.Create(CreateRequest(), CancellationToken.None);
-
-        var problem = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(502, problem.StatusCode);
-        Assert.DoesNotContain("provider secret", System.Text.Json.JsonSerializer.Serialize(problem.Value), StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("Transcription failed.", await db.VoiceRecordings.Select(x => x.Error).SingleAsync());
+        Assert.Equal(new TranscriptionJob(recording.Id), Assert.Single(transcriptionQueue.Jobs));
         Assert.Empty(await db.SpecificationAnalyses.ToListAsync());
-        Assert.Empty(queue.Jobs);
     }
 
     [Fact]
@@ -164,7 +143,7 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         await db.SaveChangesAsync();
         await using var readDb = new AppDbContext(options);
 
-        var controller = CreateController(readDb, null!, null!);
+        var controller = CreateController(readDb);
 
         var result = await controller.Get(project.Id);
 
@@ -173,8 +152,8 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         Assert.Equal(SpecificationAnalysisStatus.Completed.ToString(), details.SpecificationStatus);
     }
 
-    private static ProjectsController CreateController(AppDbContext db, ITranscriptionService transcription, ISpecificationAnalysisQueue queue) =>
-        new(db, null!, transcription, queue)
+    private static ProjectsController CreateController(AppDbContext db, ITranscriptionQueue? transcriptionQueue = null) =>
+        new(db, transcriptionQueue!)
         {
             ControllerContext = new ControllerContext
             {
@@ -196,16 +175,18 @@ public class ProjectApiTests(WebApplicationFactory<Program> factory) : IClassFix
         }
     };
 
-    private sealed class SuccessfulTranscription : ITranscriptionService
+    private sealed class RecordingTranscriptionQueue : ITranscriptionQueue
     {
-        public Task<TranscriptionResult> TranscribeAsync(byte[] audio, string fileName, CancellationToken cancellationToken) =>
-            Task.FromResult(new TranscriptionResult("transcript", "en", [new TranscriptionSegment(0, 1, "segment")]));
-    }
+        public List<TranscriptionJob> Jobs { get; } = [];
 
-    private sealed class FailedTranscription : ITranscriptionService
-    {
-        public Task<TranscriptionResult> TranscribeAsync(byte[] audio, string fileName, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("provider secret: token=abc");
+        public ValueTask EnqueueAsync(TranscriptionJob job, CancellationToken ct)
+        {
+            Jobs.Add(job);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<TranscriptionJob> DequeueAsync(CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingQueue : ISpecificationAnalysisQueue
