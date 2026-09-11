@@ -24,6 +24,8 @@ const retryOpen = ref(false)
 const retryLoading = ref(false)
 const retryError = ref('')
 
+let loadRequestId = 0
+
 const projectName = computed(() => (
   project.value?.name || String(route.query.name || `Проект ${route.params.id}`)
 ))
@@ -60,14 +62,19 @@ function getProjectId() {
 }
 
 async function loadWorkspace() {
+  const requestId = ++loadRequestId
+  const projectId = getProjectId()
+
   loading.value = true
   error.value = null
   errorSource.value = ''
 
   const [projectResult, specificationResult] = await Promise.allSettled([
-    getProject(getProjectId()),
-    getSpecification(getProjectId()),
+    getProject(projectId),
+    getSpecification(projectId),
   ])
+
+  if (requestId !== loadRequestId || projectId !== getProjectId()) return
 
   if (projectResult.status === 'fulfilled') {
     project.value = projectResult.value
@@ -104,11 +111,13 @@ function closeRetry() {
 async function confirmRetry() {
   if (retryLoading.value) return
 
+  const projectId = getProjectId()
   retryLoading.value = true
   retryError.value = ''
 
   try {
-    await retrySpecification(getProjectId())
+    await retrySpecification(projectId)
+    if (projectId !== getProjectId()) return
     retryOpen.value = false
     await loadWorkspace()
   } catch (reason) {

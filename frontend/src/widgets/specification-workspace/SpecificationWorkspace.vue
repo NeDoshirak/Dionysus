@@ -34,6 +34,7 @@ const emit = defineEmits(['refresh', 'changed'])
 
 const itemOrder = ref('server')
 const transcriptQuery = ref('')
+const transcriptOpen = ref(true)
 const activeSource = ref(null)
 const clarificationIds = ref(new Set())
 const playerRef = ref(null)
@@ -391,7 +392,22 @@ function formatTime(seconds) {
           />
           <StatusMessage v-else state="info">Запись встречи пока недоступна.</StatusMessage>
 
-          <section class="specification-workspace__transcript-panel">
+          <button
+            class="specification-workspace__transcript-toggle"
+            type="button"
+            data-action="toggle-transcript"
+            :aria-expanded="transcriptOpen ? 'true' : 'false'"
+            aria-controls="specification-transcript-panel"
+            @click="transcriptOpen = !transcriptOpen"
+          >
+            {{ transcriptOpen ? 'Скрыть транскрипцию' : 'Показать транскрипцию' }}
+          </button>
+
+          <section
+            id="specification-transcript-panel"
+            v-show="transcriptOpen"
+            class="specification-workspace__transcript-panel"
+          >
             <label class="specification-workspace__search">
               <span class="specification-workspace__search-label">Поиск по транскрипции</span>
               <input
@@ -556,6 +572,24 @@ function formatTime(seconds) {
     border-radius: var(--radius-sm)
     background: var(--color-surface)
 
+  &__transcript-toggle
+    display: none
+    min-height: 42px
+    padding: 9px 12px
+    border: 1px solid var(--color-border)
+    border-radius: var(--radius-sm)
+    background: var(--color-surface)
+    color: var(--color-accent-strong)
+    font: inherit
+    font-size: 14px
+    font-weight: 700
+    text-align: left
+    cursor: pointer
+
+    &:focus-visible
+      outline: 3px solid var(--color-focus)
+      outline-offset: 2px
+
   &__context-card
     display: grid
     gap: 10px
@@ -632,6 +666,15 @@ function formatTime(seconds) {
 
     &__aside
       position: static
+
+    &__transcript-toggle
+      display: block
+
+    :deep(.specification-player)
+      position: sticky
+      bottom: 16px
+      z-index: 3
+      box-shadow: 0 12px 32px rgba(17, 24, 39, .16)
 
 @media (max-width: 640px)
   .specification-workspace

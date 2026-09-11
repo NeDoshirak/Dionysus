@@ -133,6 +133,24 @@ describe('SpecificationPage', () => {
     intervalSpy.mockRestore()
   })
 
+  it('ignores a stale load after navigating to another project', async () => {
+    const firstProject = createDeferred()
+    const firstSpecification = createDeferred()
+    getProject.mockReturnValueOnce(firstProject.promise).mockResolvedValue({ ...projectWithTranscript, id: 'project-2', name: 'Second' })
+    getSpecification.mockReturnValueOnce(firstSpecification.promise).mockResolvedValue({ ...completedSpecification, id: 'analysis-2' })
+
+    const { router, wrapper } = await mountPage('project-1')
+    await router.push({ name: 'specification', params: { id: 'project-2' } })
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Second'))
+    firstProject.resolve({ ...projectWithTranscript, id: 'project-1', name: 'Stale first project' })
+    firstSpecification.resolve({ ...completedSpecification, id: 'stale-analysis' })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Second')
+    expect(wrapper.text()).not.toContain('Stale first project')
+  })
+
   it('shows a no-analysis state for a specification 404 after the project loads', async () => {
     getProject.mockResolvedValue(projectWithTranscript)
     getSpecification.mockRejectedValue({ status: 404 })
@@ -190,3 +208,14 @@ describe('SpecificationPage', () => {
     expect(getProject).toHaveBeenCalledTimes(2)
   })
 })
+
+function createDeferred() {
+  let resolve
+  let reject
+  const promise = new Promise((settle, fail) => {
+    resolve = settle
+    reject = fail
+  })
+
+  return { promise, resolve, reject }
+}
