@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { apiRequest } from '@/shared/api/client'
 import { createProject, findProjects, getProject, getProjects, searchProjectTranscription } from './api'
@@ -11,6 +11,10 @@ function validMedia() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 it('loads authenticated project summaries', async () => {
@@ -75,4 +79,18 @@ it('gets project details through the authenticated endpoint', async () => {
 
   await expect(getProject('project-id')).resolves.toEqual({ id: 'project-id' })
   expect(apiRequest).toHaveBeenCalledWith('/api/projects/project-id', { authenticated: true })
+})
+
+it('serves the local demo project without API requests when demo mode is enabled', async () => {
+  vi.stubEnv('VITE_DEMO_MODE', 'true')
+
+  await expect(getProjects()).resolves.toEqual([
+    expect.objectContaining({ id: 'demo-project', name: 'Демо: запуск личного кабинета', status: 'completed' }),
+  ])
+  await expect(getProject('demo-project')).resolves.toEqual(expect.objectContaining({
+    id: 'demo-project',
+    recordings: [expect.objectContaining({ id: 'demo-recording', segments: expect.any(Array) })],
+  }))
+
+  expect(apiRequest).not.toHaveBeenCalled()
 })

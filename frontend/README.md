@@ -31,6 +31,16 @@ npm install
 npm run dev
 ```
 
+### Demo specification workspace
+
+To inspect the technical-specification workspace before the backend is available, create `frontend/.env.local` with:
+
+```sh
+VITE_DEMO_MODE=true
+```
+
+Then run `npm run dev` and open `/projects`. Demo mode creates a local session and exposes one completed project, transcript, waveform preview, and specification cards. It never calls the backend for the demo project. Remove the variable (or set it to `false`) to return to the normal API flow.
+
 ### Compile and Minify for Production
 
 ```sh

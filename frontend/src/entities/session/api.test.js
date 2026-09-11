@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { apiRequest } from '@/shared/api/client'
 import { clearSession, getSession } from './model'
@@ -9,6 +9,10 @@ vi.mock('@/shared/api/client', () => ({ apiRequest: vi.fn() }))
 beforeEach(() => {
   clearSession()
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 it('returns the normalized email after body-less registration', async () => {
@@ -74,4 +78,23 @@ it('keeps the entered email after password reset request', async () => {
   apiRequest.mockResolvedValue(undefined)
 
   await expect(requestPasswordReset({ email: ' Person@example.com ' })).resolves.toEqual({ email: 'person@example.com' })
+})
+
+it('restores a local demo session without authentication requests when demo mode is enabled', async () => {
+  vi.stubEnv('VITE_DEMO_MODE', 'true')
+
+  await expect(restoreSession()).resolves.toBe(true)
+
+  expect(getSession()).toEqual(expect.objectContaining({ email: 'demo@dionysus.app', accessToken: 'demo-access-token' }))
+  expect(apiRequest).not.toHaveBeenCalled()
+})
+
+it('ends a demo session locally without calling the logout endpoint', async () => {
+  vi.stubEnv('VITE_DEMO_MODE', 'true')
+  await restoreSession()
+
+  await signOut()
+
+  expect(getSession()).toBeNull()
+  expect(apiRequest).not.toHaveBeenCalled()
 })

@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { apiRequest } from '@/shared/api/client'
 import {
@@ -12,6 +12,10 @@ vi.mock('@/shared/api/client', () => ({ apiRequest: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 it('normalizes numeric backend enums and preserves source evidence IDs', async () => {
@@ -99,4 +103,17 @@ it('retries only through the documented retry path', async () => {
   await retrySpecification('project-1')
 
   expect(apiRequest).toHaveBeenCalledWith('/api/projects/project-1/specification/retry', { method: 'POST', authenticated: true })
+})
+
+it('serves a completed local demo specification without an API request when demo mode is enabled', async () => {
+  vi.stubEnv('VITE_DEMO_MODE', 'true')
+
+  await expect(getSpecification('demo-project')).resolves.toEqual(expect.objectContaining({
+    id: 'demo-specification',
+    status: 'completed',
+    businessContext: expect.any(Array),
+    functions: expect.any(Array),
+  }))
+
+  expect(apiRequest).not.toHaveBeenCalled()
 })

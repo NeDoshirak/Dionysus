@@ -6,6 +6,7 @@ import { ProjectList } from '@/widgets/project-list'
 import { ProjectSearch } from '@/features/search-projects'
 import { CreateProjectDialog } from '@/features/create-project'
 import { getProjects } from '@/entities/project'
+import { isDemoMode } from '@/shared/config/demo'
 import { BaseButton } from '@/shared/ui'
 import plusIcon from '@/shared/assets/icons/plus.svg'
 
@@ -16,6 +17,7 @@ const loading = ref(true)
 const error = ref('')
 const showingSearchResults = ref(false)
 const createDialogOpen = ref(false)
+const demoMode = isDemoMode()
 
 async function loadProjects() {
   loading.value = true
@@ -61,7 +63,7 @@ onMounted(loadProjects)
         <h1>Мои проекты</h1>
         <div class="projects-page__actions">
           <ProjectSearch @results="updateResults" />
-          <BaseButton class="projects-page__create-button" aria-label="Новый проект" @click="createDialogOpen = true">
+          <BaseButton v-if="!demoMode" class="projects-page__create-button" aria-label="Новый проект" @click="createDialogOpen = true">
             <img :src="plusIcon" alt="" aria-hidden="true">
             <span class="visually-hidden">Новый проект</span>
           </BaseButton>
@@ -70,7 +72,7 @@ onMounted(loadProjects)
       <p class="projects-page__eyebrow">{{ showingSearchResults ? 'Результаты поиска' : 'Недавние проекты' }}</p>
       <ProjectList :projects="projects" :loading="loading" :error="error" />
     </main>
-    <CreateProjectDialog :open="createDialogOpen" @created="handleCreated" @close="createDialogOpen = false" />
+    <CreateProjectDialog v-if="!demoMode" :open="createDialogOpen" @created="handleCreated" @close="createDialogOpen = false" />
   </div>
 </template>
 

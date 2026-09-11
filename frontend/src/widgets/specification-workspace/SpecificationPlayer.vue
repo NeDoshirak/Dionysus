@@ -10,8 +10,13 @@ const props = defineProps({
 })
 
 const containerRef = ref(null)
+const streamUrl = computed(() => Object.prototype.hasOwnProperty.call(props.recording, 'streamUrl')
+  ? props.recording.streamUrl
+  : `/api/projects/${encodeURIComponent(props.projectId)}/recordings/${encodeURIComponent(props.recording.id)}/stream`)
 const options = computed(() => ({
-  url: `/api/projects/${encodeURIComponent(props.projectId)}/recordings/${encodeURIComponent(props.recording.id)}/stream`,
+  ...(streamUrl.value ? { url: streamUrl.value } : {}),
+  ...(Array.isArray(props.recording.waveformPeaks) ? { peaks: props.recording.waveformPeaks } : {}),
+  ...(Number.isFinite(props.recording.durationSeconds) ? { duration: props.recording.durationSeconds } : {}),
   height: 72,
   waveColor: '#f7b1a7',
   progressColor: '#f1361d',

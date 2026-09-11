@@ -73,6 +73,31 @@ it('streams the recording with authenticated fetch options', async () => {
   expect(getAuthenticatedFetchOptions).toHaveBeenCalledTimes(1)
 })
 
+it('renders a demo waveform from supplied peaks without a protected stream URL', async () => {
+  const SpecificationPlayer = (await import('./SpecificationPlayer.vue')).default
+  const peaks = [[.2, .7, .4]]
+
+  mount(SpecificationPlayer, {
+    props: {
+      projectId: 'demo-project',
+      recording: {
+        id: 'demo-recording',
+        streamUrl: null,
+        waveformPeaks: peaks,
+        durationSeconds: 88,
+      },
+    },
+  })
+
+  await nextTick()
+
+  expect(waveSurferState.options.value).toMatchObject({
+    peaks,
+    duration: 88,
+  })
+  expect(waveSurferState.options.value.url).toBeUndefined()
+})
+
 it('seeks through the exposed method without starting playback', async () => {
   const SpecificationPlayer = (await import('./SpecificationPlayer.vue')).default
 
