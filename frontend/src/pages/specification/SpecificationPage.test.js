@@ -1,21 +1,191 @@
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getProject, searchProjectTranscription } from '@/entities/project'
+import { getSpecification, retrySpecification } from '@/entities/specification'
+
 import SpecificationPage from './SpecificationPage.vue'
 
-it('shows a project-aware specification placeholder without editor controls', async () => {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/projects/:id/specification', name: 'specification', component: SpecificationPage }, { path: '/projects', name: 'projects', component: { template: '<div />' } }],
-  })
-  await router.push({ name: 'specification', params: { id: 'project-42' }, query: { name: 'Discovery' } })
-  await router.isReady()
-  const wrapper = mount(SpecificationPage, { global: { plugins: [router] } })
+vi.mock('@/entities/project', () => ({
+  getProject: vi.fn(),
+  searchProjectTranscription: vi.fn(),
+}))
 
-  expect(wrapper.text()).toContain('Discovery')
-  expect(wrapper.text()).toContain('Страница ТЗ готовится')
-  expect(wrapper.text()).not.toContain('Транскрипция')
-  expect(wrapper.find('[contenteditable="true"]').exists()).toBe(false)
-  await wrapper.get('.specification-page__back').trigger('click')
-  await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('projects'))
+vi.mock('@/entities/specification', () => ({
+  getSpecification: vi.fn(),
+  retrySpecification: vi.fn(),
+  analysisStatusLabels: {
+    queued: 'В очереди',
+    runningStage2: 'Проверка фактов',
+    completed: 'Готово',
+    failed: 'Анализ не завершён',
+  },
+  isSpecificationEditable: (value) => value?.status === 'completed',
+}))
+
+vi.mock('@/widgets/specification-workspace', () => ({
+  SpecificationWorkspace: {
+    name: 'SpecificationWorkspace',
+    props: {
+      projectId: { type: String, required: true },
+      project: { type: Object, required: true },
+      specification: { type: Object, required: true },
+      mutationError: { type: String, default: '' },
+    },
+    emits: ['refresh', 'changed'],
+    template: `
+      <section class="specification-workspace">
+        <p>{{ project.name }}</p>
+        <p>{{ specification.status }}</p>
+        <p v-if="mutationError">{{ mutationError }}</p>
+        <button type="button" data-action="workspace-refresh" @click="$emit('refresh')">Обновить workspace</button>
+        <button type="button" data-action="workspace-changed" @click="$emit('changed')">Сохранено workspace</button>
+      </section>
+    `,
+  },
+}))
+
+const projectWithTranscript = {
+  id: 'project-1',
+  name: 'Discovery',
+  recordings: [
+    {
+      id: 'recording-1',
+      segments: [
+        { startSeconds: 14, endSeconds: 18, text: 'Use corporate sign-in' },
+      ],
+    },
+  ],
+}
+
+const completedSpecification = {
+  id: 'analysis-1',
+  status: 'completed',
+  businessContext: [],
+  functions: [],
+  sourceStatements: [],
+  sourceSegments: [],
+}
+
+function createTestRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/projects/:id/specification', name: 'specification', component: SpecificationPage },
+      { path: '/projects', name: 'projects', component: { template: '<div />' } },
+      { path: '/profile', name: 'profile', component: { template: '<div />' } },
+    ],
+  })
+}
+
+async function mountPage(projectId = 'project-1') {
+  const router = createTestRouter()
+  await router.push({ name: 'specification', params: { id: projectId } })
+  await router.isReady()
+
+  const wrapper = mount(SpecificationPage, {
+    global: {
+      plugins: [router],
+    },
+  })
+
+  return { router, wrapper }
+}
+
+describe('SpecificationPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders the completed workspace after loading the project and specification', async () => {
+    getProject.mockResolvedValue(projectWithTranscript)
+    getSpecification.mockResolvedValue(completedSpecification)
+
+    const { router, wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.find('.specification-workspace').exists()).toBe(true))
+    expect(wrapper.text()).toContain('Discovery')
+    expect(getProject).toHaveBeenCalledWith('project-1')
+    expect(getSpecification).toHaveBeenCalledWith('project-1')
+    expect(searchProjectTranscription).not.toHaveBeenCalled()
+
+    await wrapper.get('.specification-page__back').trigger('click')
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('projects'))
+  })
+
+  it('shows a manual refresh while analysis is running and does not start an interval', async () => {
+    const intervalSpy = vi.spyOn(window, 'setInterval')
+    getProject.mockResolvedValue(projectWithTranscript)
+    getSpecification.mockResolvedValue({ id: 'analysis-1', status: 'runningStage2' })
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Проверка фактов'))
+    expect(wrapper.text()).toContain('Обновить')
+    expect(intervalSpy).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-action="refresh-analysis"]').trigger('click')
+    await vi.waitFor(() => expect(getSpecification).toHaveBeenCalledTimes(2))
+    expect(getProject).toHaveBeenCalledTimes(2)
+    expect(intervalSpy).not.toHaveBeenCalled()
+    intervalSpy.mockRestore()
+  })
+
+  it('shows a no-analysis state for a specification 404 after the project loads', async () => {
+    getProject.mockResolvedValue(projectWithTranscript)
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Анализ ТЗ пока недоступен'))
+    expect(wrapper.find('.specification-workspace').exists()).toBe(false)
+  })
+
+  it('shows the project loading error when project loading fails alongside a specification 404', async () => {
+    getProject.mockRejectedValue({ message: 'Проект не найден' })
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    const { wrapper } = await mountPage('missing-project')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Проект не найден'))
+    expect(wrapper.text()).not.toContain('Анализ ТЗ пока недоступен')
+    expect(wrapper.find('.specification-workspace').exists()).toBe(false)
+  })
+
+  it('refreshes the loaded data once after a workspace mutation event', async () => {
+    getProject.mockResolvedValue(projectWithTranscript)
+    getSpecification.mockResolvedValue(completedSpecification)
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.find('.specification-workspace').exists()).toBe(true))
+    await wrapper.get('[data-action="workspace-changed"]').trigger('click')
+    await vi.waitFor(() => expect(getSpecification).toHaveBeenCalledTimes(2))
+
+    expect(getProject).toHaveBeenCalledTimes(2)
+    expect(searchProjectTranscription).not.toHaveBeenCalled()
+  })
+
+  it('confirms retry for failed analysis and reloads the workspace once after retry succeeds', async () => {
+    getProject.mockResolvedValue(projectWithTranscript)
+    getSpecification
+      .mockResolvedValueOnce({ id: 'analysis-1', status: 'failed', errorMessage: 'LLM unavailable' })
+      .mockResolvedValueOnce(completedSpecification)
+    retrySpecification.mockResolvedValue({ analysisId: 'analysis-1', runId: 'run-2' })
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Анализ не завершён'))
+    await wrapper.get('[data-action="retry-analysis"]').trigger('click')
+    await nextTick()
+    await wrapper.get('[data-action="confirm-retry"]').trigger('click')
+
+    await vi.waitFor(() => expect(wrapper.find('.specification-workspace').exists()).toBe(true))
+    expect(retrySpecification).toHaveBeenCalledTimes(1)
+    expect(retrySpecification).toHaveBeenCalledWith('project-1')
+    expect(getSpecification).toHaveBeenCalledTimes(2)
+    expect(getProject).toHaveBeenCalledTimes(2)
+  })
 })
