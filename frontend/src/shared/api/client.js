@@ -25,6 +25,11 @@ function buildRequestOptions({ method = 'GET', body, authenticated }) {
   }
 }
 
+export function getAuthenticatedFetchOptions() {
+  const { credentials, headers } = buildRequestOptions({ authenticated: true })
+  return { credentials, headers }
+}
+
 async function getPayload(response) {
   if (response.status === 204) return undefined
 

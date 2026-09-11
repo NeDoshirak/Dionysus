@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { apiRequest, configureApi } from './client'
+import { apiRequest, configureApi, getAuthenticatedFetchOptions } from './client'
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -15,6 +15,15 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+it('returns refresh-cookie and bearer settings for protected media', () => {
+  configureApi({ getAccessToken: () => 'wave-token' })
+
+  expect(getAuthenticatedFetchOptions()).toEqual({
+    credentials: 'include',
+    headers: { Accept: 'application/json', Authorization: 'Bearer wave-token' },
+  })
 })
 
 it('adds a bearer token and credentials to a protected JSON request', async () => {
