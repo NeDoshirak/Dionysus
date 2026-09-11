@@ -66,6 +66,7 @@ services:
     build:
       context: ./backend
       target: development
+      network: host
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_USE_POLLING_FILE_WATCHER: "1"

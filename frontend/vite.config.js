@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
       vueDevTools(),
     ],
     server: {
+      allowedHosts: ['specscribe.ru'],
       proxy: {
         '/api': {
           target: apiProxyTarget,
