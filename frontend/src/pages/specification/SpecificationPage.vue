@@ -1,24 +1,195 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { getProject } from '@/entities/project'
+import {
+  analysisStatusLabels,
+  getSpecification,
+  isSpecificationEditable,
+  retrySpecification,
+} from '@/entities/specification'
+import { SpecificationConfirmDialog } from '@/features/manage-specification'
 import { AppHeader } from '@/widgets/app-header'
+import { SpecificationWorkspace } from '@/widgets/specification-workspace'
+import { BaseButton, StatusMessage } from '@/shared/ui'
 
 const route = useRoute()
-const projectName = computed(() => String(route.query.name || `Проект ${route.params.id}`))
+
+const project = ref(null)
+const specification = ref(null)
+const loading = ref(true)
+const error = ref(null)
+const errorSource = ref('')
+const retryOpen = ref(false)
+const retryLoading = ref(false)
+const retryError = ref('')
+
+const projectName = computed(() => (
+  project.value?.name || String(route.query.name || `Проект ${route.params.id}`)
+))
+
+const statusLabel = computed(() => (
+  analysisStatusLabels[specification.value?.status]
+    || specification.value?.status
+    || 'Анализ ТЗ'
+))
+
+const viewState = computed(() => {
+  if (loading.value) return 'loading'
+  if (errorSource.value === 'project') return 'error'
+  if (error.value?.status === 404) return 'empty'
+  if (error.value) return 'error'
+  if (specification.value?.status === 'failed') return 'failed'
+  if (!isSpecificationEditable(specification.value)) return 'processing'
+  return 'completed'
+})
+
+const errorMessage = computed(() => {
+  if (error.value?.detail) return error.value.detail
+  if (error.value?.message) return error.value.message
+  if (errorSource.value === 'project') return 'Не удалось загрузить проект.'
+  return 'Не удалось загрузить анализ ТЗ.'
+})
+
+const failedAnalysisMessage = computed(() => (
+  specification.value?.errorMessage || 'Не удалось завершить анализ ТЗ.'
+))
+
+function getProjectId() {
+  return String(route.params.id)
+}
+
+async function loadWorkspace() {
+  loading.value = true
+  error.value = null
+  errorSource.value = ''
+
+  const [projectResult, specificationResult] = await Promise.allSettled([
+    getProject(getProjectId()),
+    getSpecification(getProjectId()),
+  ])
+
+  if (projectResult.status === 'fulfilled') {
+    project.value = projectResult.value
+  } else {
+    project.value = null
+    error.value = projectResult.reason
+    errorSource.value = 'project'
+  }
+
+  if (specificationResult.status === 'fulfilled') {
+    specification.value = specificationResult.value
+  } else {
+    specification.value = null
+    if (projectResult.status === 'fulfilled') {
+      error.value = specificationResult.reason
+      errorSource.value = 'specification'
+    }
+  }
+
+  loading.value = false
+}
+
+function openRetry() {
+  retryError.value = ''
+  retryOpen.value = true
+}
+
+function closeRetry() {
+  if (retryLoading.value) return
+  retryOpen.value = false
+  retryError.value = ''
+}
+
+async function confirmRetry() {
+  if (retryLoading.value) return
+
+  retryLoading.value = true
+  retryError.value = ''
+
+  try {
+    await retrySpecification(getProjectId())
+    retryOpen.value = false
+    await loadWorkspace()
+  } catch (reason) {
+    retryError.value = reason?.detail || reason?.message || 'Не удалось повторить анализ ТЗ.'
+  } finally {
+    retryLoading.value = false
+  }
+}
+
+function refreshWorkspace() {
+  return loadWorkspace()
+}
+
+onMounted(loadWorkspace)
+watch(() => route.params.id, loadWorkspace)
 </script>
 
 <template>
   <div class="specification-page">
     <AppHeader />
     <main class="specification-page__main">
-      <p class="specification-page__eyebrow">Проект</p>
-      <h1>{{ projectName }}</h1>
-      <section class="specification-page__placeholder">
-        <div class="specification-page__icon" aria-hidden="true">✦</div>
-        <h2>Страница ТЗ готовится</h2>
-        <p>Здесь появится структурированное техническое задание по итогам встречи. Редактор, транскрипция и плеер будут добавлены на следующем этапе.</p>
+      <div class="specification-page__heading">
+        <div>
+          <p class="specification-page__eyebrow">Проект</p>
+          <h1 class="specification-page__title">{{ projectName }}</h1>
+        </div>
+        <RouterLink class="specification-page__back" :to="{ name: 'projects' }">← Вернуться к проектам</RouterLink>
+      </div>
+
+      <StatusMessage v-if="viewState === 'loading'" state="loading">
+        Загружаем проект и техническое задание...
+      </StatusMessage>
+
+      <StatusMessage v-else-if="viewState === 'error'" state="error">
+        {{ errorMessage }}
+      </StatusMessage>
+
+      <StatusMessage v-else-if="viewState === 'empty'" state="info">
+        Анализ ТЗ пока недоступен.
+      </StatusMessage>
+
+      <section v-else-if="viewState === 'failed'" class="specification-page__state">
+        <StatusMessage state="error">
+          <strong>{{ statusLabel }}</strong>
+          <span class="specification-page__state-description">{{ failedAnalysisMessage }}</span>
+        </StatusMessage>
+        <BaseButton type="button" data-action="retry-analysis" @click="openRetry">
+          Повторить анализ
+        </BaseButton>
       </section>
-      <RouterLink class="specification-page__back" :to="{ name: 'projects' }">← Вернуться к проектам</RouterLink>
+
+      <section v-else-if="viewState === 'processing'" class="specification-page__state">
+        <StatusMessage state="info">
+          Анализ ТЗ: {{ statusLabel }}. Обновите данные вручную, когда обработка завершится.
+        </StatusMessage>
+        <BaseButton type="button" variant="outline" data-action="refresh-analysis" @click="refreshWorkspace">
+          Обновить
+        </BaseButton>
+      </section>
+
+      <SpecificationWorkspace
+        v-else
+        :project-id="getProjectId()"
+        :project="project"
+        :specification="specification"
+        @changed="refreshWorkspace"
+        @refresh="refreshWorkspace"
+      />
+
+      <div v-if="retryOpen" class="specification-page__retry-confirm" data-action="confirm-retry" @click.self="confirmRetry">
+        <SpecificationConfirmDialog
+          :open="retryOpen"
+          title="Повторить анализ ТЗ?"
+          message="Текущий неудачный анализ будет запущен заново."
+          confirm-label="Повторить"
+          :error="retryError"
+          :loading="retryLoading"
+          @confirm="confirmRetry"
+          @close="closeRetry"
+        />
+      </div>
     </main>
   </div>
 </template>
@@ -29,10 +200,16 @@ const projectName = computed(() => String(route.query.name || `Проект ${ro
   background: var(--color-background)
 
   &__main
-    width: min(100%, 760px)
+    width: min(100%, 1120px)
     margin: 0 auto
-    padding: 48px 24px
-    text-align: center
+    padding: 40px 32px 64px
+
+  &__heading
+    display: flex
+    align-items: flex-end
+    justify-content: space-between
+    gap: 24px
+    margin-bottom: 32px
 
   &__eyebrow
     margin: 0 0 8px
@@ -42,46 +219,52 @@ const projectName = computed(() => String(route.query.name || `Проект ${ro
     letter-spacing: .8px
     text-transform: uppercase
 
-  h1
+  &__title
     margin: 0
-    font-size: 30px
-
-  &__placeholder
-    display: grid
-    justify-items: center
-    gap: 10px
-    margin-top: 40px
-    padding: 56px 32px
-    border: 1px dashed #d1d5db
-    border-radius: 16px
-    background: var(--color-surface)
-
-    h2, p
-      margin: 0
-
-    h2
-      font-size: 20px
-
-    p
-      max-width: 500px
-      color: var(--color-muted)
-      font-size: 14px
-      line-height: 1.6
-
-  &__icon
-    display: grid
-    width: 48px
-    height: 48px
-    place-items: center
-    border-radius: 50%
-    background: var(--color-accent-soft)
-    color: var(--color-accent)
-    font-size: 24px
+    color: var(--color-text)
+    font-size: 34px
+    line-height: 1.2
 
   &__back
-    display: inline-block
-    margin-top: 24px
+    flex-shrink: 0
     color: var(--color-accent-strong)
     font-size: 14px
     font-weight: 600
+    text-decoration: none
+
+    &:hover
+      text-decoration: underline
+      text-underline-offset: 4px
+
+  &__state
+    display: flex
+    align-items: flex-start
+    justify-content: space-between
+    gap: 20px
+
+  &__state-description
+    display: block
+    margin-top: 4px
+
+  &__retry-confirm
+    position: relative
+
+@media (max-width: 720px)
+  .specification-page
+    &__main
+      padding: 28px 20px 48px
+
+    &__heading,
+    &__state
+      align-items: stretch
+      flex-direction: column
+
+    &__heading
+      gap: 16px
+
+    &__title
+      font-size: 28px
+
+    &__back
+      order: -1
 </style>
