@@ -171,13 +171,14 @@ describe('SpecificationPage', () => {
   it('confirms retry for failed analysis and reloads the workspace once after retry succeeds', async () => {
     getProject.mockResolvedValue(projectWithTranscript)
     getSpecification
-      .mockResolvedValueOnce({ id: 'analysis-1', status: 'failed', errorMessage: 'LLM unavailable' })
+      .mockResolvedValueOnce({ id: 'analysis-1', status: 'failed', error: 'LLM unavailable' })
       .mockResolvedValueOnce(completedSpecification)
     retrySpecification.mockResolvedValue({ analysisId: 'analysis-1', runId: 'run-2' })
 
     const { wrapper } = await mountPage('project-1')
 
     await vi.waitFor(() => expect(wrapper.text()).toContain('Анализ не завершён'))
+    expect(wrapper.text()).toContain('LLM unavailable')
     await wrapper.get('[data-action="retry-analysis"]').trigger('click')
     await nextTick()
     await wrapper.get('[data-action="confirm-retry"]').trigger('click')
