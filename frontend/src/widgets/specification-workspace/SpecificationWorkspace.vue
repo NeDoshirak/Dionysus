@@ -37,10 +37,13 @@ const transcriptQuery = ref('')
 const activeSource = ref(null)
 const clarificationIds = ref(new Set())
 const playerRef = ref(null)
+const pendingOperation = ref('')
 
-const functionForm = ref({ open: false, mode: 'create', functionItem: null, error: '' })
-const cardForm = ref({ open: false, mode: 'create', functionItem: null, item: null, error: '' })
-const confirmation = ref({ open: false, type: '', functionItem: null, item: null, error: '' })
+let nextRequestScopeId = 0
+
+const functionForm = ref(createFunctionFormState())
+const cardForm = ref(createCardFormState())
+const confirmation = ref(createConfirmationState())
 
 const editable = computed(() => isSpecificationEditable(props.specification))
 const statusLabel = computed(() => (
@@ -76,98 +79,175 @@ function getErrorMessage(error) {
   return error?.detail || error?.message || 'Не удалось сохранить изменения'
 }
 
+function createFunctionFormState(overrides = {}) {
+  return {
+    open: false,
+    mode: 'create',
+    functionItem: null,
+    error: '',
+    pending: false,
+    scopeId: nextRequestScopeId++,
+    ...overrides,
+  }
+}
+
+function createCardFormState(overrides = {}) {
+  return {
+    open: false,
+    mode: 'create',
+    functionItem: null,
+    item: null,
+    error: '',
+    pending: false,
+    scopeId: nextRequestScopeId++,
+    ...overrides,
+  }
+}
+
+function createConfirmationState(overrides = {}) {
+  return {
+    open: false,
+    type: '',
+    functionItem: null,
+    item: null,
+    error: '',
+    pending: false,
+    scopeId: nextRequestScopeId++,
+    ...overrides,
+  }
+}
+
 function resetFunctionForm() {
-  functionForm.value = { open: false, mode: 'create', functionItem: null, error: '' }
+  functionForm.value = createFunctionFormState()
 }
 
 function resetCardForm() {
-  cardForm.value = { open: false, mode: 'create', functionItem: null, item: null, error: '' }
+  cardForm.value = createCardFormState()
 }
 
 function resetConfirmation() {
-  confirmation.value = { open: false, type: '', functionItem: null, item: null, error: '' }
+  confirmation.value = createConfirmationState()
 }
 
 function openCreateFunction() {
   if (!editable.value) return
-  functionForm.value = { open: true, mode: 'create', functionItem: null, error: '' }
+  functionForm.value = createFunctionFormState({ open: true })
 }
 
 function openEditFunction(functionItem) {
   if (!editable.value) return
-  functionForm.value = { open: true, mode: 'edit', functionItem, error: '' }
+  functionForm.value = createFunctionFormState({ open: true, mode: 'edit', functionItem })
 }
 
 function openCreateItem(functionItem) {
   if (!editable.value) return
-  cardForm.value = { open: true, mode: 'create', functionItem, item: null, error: '' }
+  cardForm.value = createCardFormState({ open: true, functionItem })
 }
 
 function openEditItem(functionItem, item) {
   if (!editable.value) return
-  cardForm.value = { open: true, mode: 'edit', functionItem, item, error: '' }
+  cardForm.value = createCardFormState({ open: true, mode: 'edit', functionItem, item })
 }
 
 function requestDeleteFunction(functionItem) {
   if (!editable.value) return
-  confirmation.value = { open: true, type: 'function', functionItem, item: null, error: '' }
+  confirmation.value = createConfirmationState({ open: true, type: 'function', functionItem })
 }
 
 function requestDeleteItem(functionItem, item) {
   if (!editable.value) return
-  confirmation.value = { open: true, type: 'item', functionItem, item, error: '' }
+  confirmation.value = createConfirmationState({ open: true, type: 'item', functionItem, item })
 }
 
 async function saveFunction(body) {
-  functionForm.value.error = ''
+  if (pendingOperation.value || functionForm.value.pending) return
+
+  const scopeId = functionForm.value.scopeId
+  const functionItem = functionForm.value.functionItem
+  const isEdit = functionForm.value.mode === 'edit'
+  functionForm.value = { ...functionForm.value, error: '', pending: true }
+  pendingOperation.value = 'function'
 
   try {
-    if (functionForm.value.mode === 'edit') {
-      await updateSpecificationFunction(props.projectId, functionForm.value.functionItem.id, body)
+    if (isEdit) {
+      await updateSpecificationFunction(props.projectId, functionItem.id, body)
     } else {
       await createSpecificationFunction(props.projectId, body)
     }
-    resetFunctionForm()
     emit('changed')
   } catch (error) {
-    functionForm.value.error = getErrorMessage(error)
+    if (functionForm.value.scopeId === scopeId) {
+      functionForm.value = { ...functionForm.value, error: getErrorMessage(error), pending: false }
+    }
+    return
+  } finally {
+    pendingOperation.value = ''
+  }
+
+  if (functionForm.value.scopeId === scopeId) {
+    resetFunctionForm()
   }
 }
 
 async function saveItem(body) {
-  cardForm.value.error = ''
+  if (pendingOperation.value || cardForm.value.pending) return
+
+  const scopeId = cardForm.value.scopeId
   const functionId = cardForm.value.functionItem?.id
+  const itemId = cardForm.value.item?.id
+  const isEdit = cardForm.value.mode === 'edit'
+  cardForm.value = { ...cardForm.value, error: '', pending: true }
+  pendingOperation.value = 'card'
 
   try {
-    if (cardForm.value.mode === 'edit') {
-      await updateSpecificationItem(props.projectId, functionId, cardForm.value.item.id, body)
+    if (isEdit) {
+      await updateSpecificationItem(props.projectId, functionId, itemId, body)
     } else {
       await createSpecificationItem(props.projectId, functionId, body)
     }
-    resetCardForm()
     emit('changed')
   } catch (error) {
-    cardForm.value.error = getErrorMessage(error)
+    if (cardForm.value.scopeId === scopeId) {
+      cardForm.value = { ...cardForm.value, error: getErrorMessage(error), pending: false }
+    }
+    return
+  } finally {
+    pendingOperation.value = ''
+  }
+
+  if (cardForm.value.scopeId === scopeId) {
+    resetCardForm()
   }
 }
 
 async function confirmDelete() {
-  confirmation.value.error = ''
+  if (pendingOperation.value || confirmation.value.pending) return
+
+  const scopeId = confirmation.value.scopeId
+  const type = confirmation.value.type
+  const functionId = confirmation.value.functionItem?.id
+  const itemId = confirmation.value.item?.id
+  confirmation.value = { ...confirmation.value, error: '', pending: true }
+  pendingOperation.value = 'delete'
 
   try {
-    if (confirmation.value.type === 'function') {
-      await deleteSpecificationFunction(props.projectId, confirmation.value.functionItem.id)
+    if (type === 'function') {
+      await deleteSpecificationFunction(props.projectId, functionId)
     } else {
-      await deleteSpecificationItem(
-        props.projectId,
-        confirmation.value.functionItem.id,
-        confirmation.value.item.id,
-      )
+      await deleteSpecificationItem(props.projectId, functionId, itemId)
     }
-    resetConfirmation()
     emit('changed')
   } catch (error) {
-    confirmation.value.error = getErrorMessage(error)
+    if (confirmation.value.scopeId === scopeId) {
+      confirmation.value = { ...confirmation.value, error: getErrorMessage(error), pending: false }
+    }
+    return
+  } finally {
+    pendingOperation.value = ''
+  }
+
+  if (confirmation.value.scopeId === scopeId) {
+    resetConfirmation()
   }
 }
 
@@ -183,6 +263,7 @@ function toggleClarification(itemId, clarified) {
 
 function selectSource(source) {
   activeSource.value = source
+  transcriptQuery.value = ''
   playerRef.value?.seek(Number(source.startSeconds) || 0)
 }
 
@@ -227,6 +308,7 @@ function formatTime(seconds) {
     </header>
 
     <StatusMessage v-if="mutationError" state="error">{{ mutationError }}</StatusMessage>
+    <StatusMessage v-if="pendingOperation" state="loading">Сохраняем изменения...</StatusMessage>
 
     <StatusMessage v-if="!specification" state="info">
       Спецификация для проекта пока недоступна.
@@ -357,10 +439,11 @@ function formatTime(seconds) {
         :title="confirmationTitle"
         :message="confirmationMessage"
         confirm-label="Удалить"
+        :error="confirmation.error"
+        :loading="confirmation.pending"
         @confirm="confirmDelete"
         @close="resetConfirmation"
       />
-      <StatusMessage v-if="confirmation.error" state="error">{{ confirmation.error }}</StatusMessage>
     </template>
 
     <StatusMessage v-else state="info">
