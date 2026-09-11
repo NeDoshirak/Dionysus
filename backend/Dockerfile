@@ -1,3 +1,14 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS development
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY Dionysus.Api/Dionysus.Api.csproj Dionysus.Api/
+RUN dotnet restore Dionysus.Api/Dionysus.Api.csproj
+COPY Dionysus.Api/ Dionysus.Api/
+EXPOSE 8000
+CMD ["dotnet", "watch", "--project", "Dionysus.Api/Dionysus.Api.csproj", "run", "--urls", "http://0.0.0.0:8000"]
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY Dionysus.Api/Dionysus.Api.csproj Dionysus.Api/

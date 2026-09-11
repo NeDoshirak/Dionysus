@@ -2,17 +2,29 @@
 
 Минимальный full-stack каркас: Vite + React frontend, ASP.NET Core 8 API, PostgreSQL и Whisper для распознавания речи.
 
-## Запуск
+## Локальная разработка
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose --profile dev up --build
+```
+
+- Frontend с Vite HMR: http://localhost:5173
+- API: http://localhost:8000/swagger/index.html
+- API health: http://localhost:8000/health
+
+В этом режиме исходники frontend и backend монтируются в контейнеры: Vite и
+`dotnet watch` автоматически применяют изменения. Frontend направляет запросы
+`/api` через proxy в `backend-dev`, поэтому браузер работает с тем же origin и
+refresh cookie. Swagger и API доступны напрямую по `localhost:8000`.
+
+Для production-конфигурации используйте:
+
+```bash
+docker compose --profile production up --build
 ```
 
 - Frontend: http://localhost:3000
-- API: http://localhost:8000/swagger/index.html
-- API health: http://localhost:8000/health
-- Whisper: http://localhost:9000
 
 Распознавание выполняется при создании проекта: `POST /api/projects` принимает
 `multipart/form-data` с полями `name` и `media`. Поддерживаются аудио и видео;
