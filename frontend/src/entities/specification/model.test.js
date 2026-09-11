@@ -1,6 +1,21 @@
 import { expect, it } from 'vitest'
 
+import { editableItemKinds, itemKindOrder } from './index'
 import { getTranscriptSegments, isSpecificationEditable, sortItems } from './model'
+
+it('exposes editable kinds and deterministic type order from the public API', () => {
+  expect(editableItemKinds).toEqual([
+    'functionalRequirement',
+    'role',
+    'userScenario',
+    'constraint',
+    'condition',
+    'agreement',
+    'keyQuestion',
+  ])
+  expect(itemKindOrder.functionalRequirement).toBe(0)
+  expect(itemKindOrder.projectContradiction).toBe(8)
+})
 
 it('keeps server order or groups cards alphabetically by displayed kind', () => {
   const items = [
