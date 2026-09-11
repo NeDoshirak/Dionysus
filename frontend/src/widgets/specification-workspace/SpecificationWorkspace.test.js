@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 
 import SpecificationWorkspace from './SpecificationWorkspace.vue'
@@ -130,6 +130,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 function createDeferred() {
   let resolve
   let reject
@@ -190,6 +194,16 @@ it('can collapse the transcript panel for the compact workspace layout', async (
 
   expect(toggle.attributes('aria-expanded')).toBe('false')
   expect(panel.attributes('style')).toContain('display: none')
+})
+
+it('keeps the demo specification interactive for viewing but read-only for mutations', () => {
+  vi.stubEnv('VITE_DEMO_MODE', 'true')
+  const wrapper = mountWorkspace({ projectId: 'demo-project' })
+
+  expect(wrapper.text()).toContain('Демо-режим: редактирование недоступно.')
+  expect(wrapper.find('[data-action="add-function"]').exists()).toBe(false)
+  expect(wrapper.find('[data-action="add-item-function-1"]').exists()).toBe(false)
+  expect(wrapper.find('.specification-transcript').exists()).toBe(true)
 })
 
 it('keeps selected source evidence visible when a transcript filter is active', async () => {

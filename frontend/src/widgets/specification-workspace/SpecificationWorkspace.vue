@@ -18,6 +18,7 @@ import {
   SpecificationFunctionForm,
 } from '@/features/manage-specification'
 import { BaseButton, StatusMessage } from '@/shared/ui'
+import { isDemoMode } from '@/shared/config/demo'
 
 import SpecificationFunctionSection from './SpecificationFunctionSection.vue'
 import SpecificationPlayer from './SpecificationPlayer.vue'
@@ -46,7 +47,9 @@ const functionForm = ref(createFunctionFormState())
 const cardForm = ref(createCardFormState())
 const confirmation = ref(createConfirmationState())
 
-const editable = computed(() => isSpecificationEditable(props.specification))
+const demoPreview = computed(() => isDemoMode())
+const displayWorkspace = computed(() => isSpecificationEditable(props.specification))
+const editable = computed(() => displayWorkspace.value && !demoPreview.value)
 const statusLabel = computed(() => (
   analysisStatusLabels[props.specification?.status] || props.specification?.status || 'Нет анализа'
 ))
@@ -298,7 +301,7 @@ function formatTime(seconds) {
           Добавить функцию
         </BaseButton>
         <BaseButton
-          v-else
+          v-else-if="!demoPreview"
           type="button"
           variant="outline"
           @click="emit('refresh')"
@@ -310,12 +313,13 @@ function formatTime(seconds) {
 
     <StatusMessage v-if="mutationError" state="error">{{ mutationError }}</StatusMessage>
     <StatusMessage v-if="pendingOperation" state="loading">Сохраняем изменения...</StatusMessage>
+    <StatusMessage v-if="demoPreview" state="info">Демо-режим: редактирование недоступно.</StatusMessage>
 
     <StatusMessage v-if="!specification" state="info">
       Спецификация для проекта пока недоступна.
     </StatusMessage>
 
-    <template v-else-if="editable">
+    <template v-else-if="displayWorkspace">
       <div class="specification-workspace__layout">
         <main class="specification-workspace__main">
           <section v-if="businessContext.length" class="specification-workspace__section">

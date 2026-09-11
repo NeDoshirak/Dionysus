@@ -1,5 +1,12 @@
 import { apiRequest } from '@/shared/api/client'
+import { isDemoMode } from '@/shared/config/demo'
 import { clearSession, getSession, setSession } from './model'
+
+const demoSession = {
+  accessToken: 'demo-access-token',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  email: 'demo@dionysus.app',
+}
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase()
@@ -31,6 +38,8 @@ export async function verifyEmail({ email, code }) {
 
 export async function signIn({ email, password }) {
   const normalizedEmail = normalizeEmail(email)
+  if (isDemoMode()) return setTokenSession(demoSession, normalizedEmail || demoSession.email)
+
   try {
     const token = await apiRequest('/api/auth/login', {
       method: 'POST',
@@ -54,6 +63,11 @@ export async function getCurrentUser() {
 
 export async function restoreSession() {
   if (getSession()) return true
+  if (isDemoMode()) {
+    setSession(demoSession)
+    return true
+  }
+
   try {
     const token = await refreshSession()
     const user = await getCurrentUser()
@@ -66,6 +80,11 @@ export async function restoreSession() {
 }
 
 export async function signOut() {
+  if (isDemoMode()) {
+    clearSession()
+    return
+  }
+
   try {
     await apiRequest('/api/auth/logout', { method: 'POST' })
   } catch {
