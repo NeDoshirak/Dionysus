@@ -138,7 +138,7 @@ describe('SpecificationPage', () => {
   })
 
   it('polls project details after three seconds while transcription is processing', async () => {
-    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 1)
+    const timerSpy = vi.spyOn(window, 'setTimeout').mockImplementation(() => 1)
     getProject.mockResolvedValue({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
     getSpecification.mockRejectedValue({ status: 404 })
 
@@ -153,7 +153,7 @@ describe('SpecificationPage', () => {
   })
 
   it('stops transcription polling after a terminal recording status', async () => {
-    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 1)
+    const timerSpy = vi.spyOn(window, 'setTimeout').mockImplementation(() => 1)
     getProject
       .mockResolvedValueOnce({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
       .mockResolvedValueOnce({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'completed', segments: [] }] })
@@ -183,8 +183,8 @@ describe('SpecificationPage', () => {
   })
 
   it('clears the scheduled transcription refresh when the page unmounts', async () => {
-    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 42)
-    const clearTimerSpy = vi.spyOn(global, 'clearTimeout')
+    const timerSpy = vi.spyOn(window, 'setTimeout').mockImplementation(() => 42)
+    const clearTimerSpy = vi.spyOn(window, 'clearTimeout')
     getProject.mockResolvedValue({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
     getSpecification.mockRejectedValue({ status: 404 })
 
