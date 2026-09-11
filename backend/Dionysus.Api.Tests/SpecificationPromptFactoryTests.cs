@@ -76,4 +76,18 @@ public sealed class SpecificationPromptFactoryTests
         Assert.Contains("required|desirable|future|unknown", instructions);
         Assert.Contains("contradiction|unresolved|missingInformation", instructions);
     }
+
+    [Fact]
+    public void Final_instructions_require_direct_segment_sources_and_russian_output()
+    {
+        var instructions = _factory.FinalInstructions();
+
+        Assert.Contains("senior system analyst", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sourceSegmentIds", instructions);
+        Assert.Contains("segment ID", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Russian", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Do not invent", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("one JSON object only", instructions, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("keyQuestions", instructions);
+    }
 }

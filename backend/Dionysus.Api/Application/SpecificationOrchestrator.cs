@@ -16,7 +16,7 @@ public sealed class SpecificationOrchestrator(
         if (analysis is null || analysis.RunId != job.RunId || analysis.Status == SpecificationAnalysisStatus.Completed)
             return;
 
-        var stage = 0;
+        var stage = "stage0";
         try
         {
             var recording = analysis.Project.Recordings.SingleOrDefault(recording => recording.IsCurrent)
@@ -34,32 +34,18 @@ public sealed class SpecificationOrchestrator(
                 foreach (var segment in segments) segment.CleanedText = cleaned[segment.Id].CleanedText;
             }, ct)) return;
 
-            stage = 1;
-            if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage1, null, ct)) return;
-            var stage1Request = new Stage1ExtractionRequest("1.0", segments.Select(ToStageSegment).ToList());
-            var stage1 = await ai.RunStage1Async(stage1Request, ct);
-            validator.ValidateStage1(segments, stage1);
-            if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage1, () =>
-            {
-                analysis.Stage1RawResponse = Serialize(stage1);
-                PersistStage1(analysis, stage1);
-            }, ct)) return;
-
-            stage = 2;
-            if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage2, null, ct)) return;
-            var stage2 = await ai.RunStage2Async(stage1, ct);
-            validator.ValidateStage2(stage1, stage2);
-            if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage2, () =>
-            {
-                analysis.Stage2RawResponse = Serialize(stage2);
-                PersistStage2(analysis, stage2);
-            }, ct)) return;
-
+            stage = "final";
             if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage3, null, ct)) return;
-            stage = 3;
-            var stage3Results = await RunStage3Async(analysis, ct);
-            if (!await MutateAsync(analysis, job, SpecificationAnalysisStatus.RunningStage3, null, ct)) return;
-            await PublishStage3Async(analysis, job, stage3Results, ct);
+            var finalRequest = new FinalSpecificationRequest(
+                "1.0",
+                segments.Select(segment => new StageSegmentDto(
+                    segment.Id,
+                    segment.StartSeconds,
+                    segment.EndSeconds,
+                    segment.CleanedText ?? segment.Text)).ToList());
+            var final = await ai.RunFinalSpecificationAsync(finalRequest, ct);
+            validator.ValidateFinal(finalRequest, final);
+            await PublishFinalAsync(analysis, job, segments, final, ct);
         }
         catch (OperationCanceledException)
         {
@@ -100,7 +86,7 @@ public sealed class SpecificationOrchestrator(
         return true;
     }
 
-    private async Task MarkFailedAsync(SpecificationAnalysisJob job, int stage, Exception exception)
+    private async Task MarkFailedAsync(SpecificationAnalysisJob job, string stage, Exception exception)
     {
         db.ChangeTracker.Clear();
         var analysis = await db.SpecificationAnalyses.SingleOrDefaultAsync(x => x.Id == job.AnalysisId);
@@ -111,8 +97,8 @@ public sealed class SpecificationOrchestrator(
             : ((string?)null, exception);
         var diagnosticCode = DiagnosticCode(cause);
         analysis.Error = topicId is null
-            ? $"stage{stage} failed: {diagnosticCode}"
-            : $"stage{stage} failed: {topicId}/{diagnosticCode}";
+            ? $"{stage} failed: {diagnosticCode}"
+            : $"{stage} failed: {topicId}/{diagnosticCode}";
         _logger.LogError(
             "Specification analysis failed. AnalysisId: {AnalysisId}; Stage: {Stage}; TopicId: {TopicId}; FailureType: {FailureType}; DiagnosticCode: {DiagnosticCode}",
             job.AnalysisId,
@@ -193,6 +179,108 @@ public sealed class SpecificationOrchestrator(
                 relation.SourceStatementLinks.Select(link => statementsById.Values.Single(statement => statement.Id == link.AnalysisStatementId).ExternalId).ToList(),
                 relation.TargetStatementLinks.Select(link => statementsById.Values.Single(statement => statement.Id == link.AnalysisStatementId).ExternalId).ToList(),
                 relation.Reason ?? string.Empty);
+    }
+
+    private async Task PublishFinalAsync(
+        SpecificationAnalysis analysis,
+        SpecificationAnalysisJob job,
+        IReadOnlyList<TranscriptSegment> segments,
+        FinalSpecificationResponse response,
+        CancellationToken ct)
+    {
+        var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
+        try
+        {
+            var statementsBySegmentId = new Dictionary<Guid, AnalysisStatement>();
+            foreach (var segment in segments)
+            {
+                var statement = new AnalysisStatement
+                {
+                    SpecificationAnalysisId = analysis.Id,
+                    ExternalId = $"segment-{segment.Id:N}",
+                    Text = segment.CleanedText ?? segment.Text,
+                    Status = AnalysisStatementStatus.Active
+                };
+                statement.SegmentLinks.Add(new AnalysisStatementSegment
+                {
+                    AnalysisStatementId = statement.Id,
+                    TranscriptSegmentId = segment.Id
+                });
+                analysis.Statements.Add(statement);
+                db.Add(statement);
+                db.AddRange(statement.SegmentLinks);
+                statementsBySegmentId.Add(segment.Id, statement);
+            }
+
+            var function = new SpecificationFunction
+            {
+                SpecificationAnalysisId = analysis.Id,
+                Title = response.Title,
+                Description = response.Description,
+                SortOrder = 0
+            };
+            foreach (var statement in statementsBySegmentId.Values)
+            {
+                function.StatementLinks.Add(new SpecificationFunctionStatement
+                {
+                    SpecificationFunctionId = function.Id,
+                    AnalysisStatementId = statement.Id
+                });
+            }
+            analysis.Functions.Add(function);
+            db.Add(function);
+            db.AddRange(function.StatementLinks);
+
+            var sortOrder = 0;
+            AddItems(response.BusinessContext.Select(item => (SpecificationItemKind.BusinessContext, (string?)item.Id, item.Text, (string?)null, item.SourceSegmentIds)));
+            AddItems(response.Roles.Select(item => (SpecificationItemKind.Role, (string?)item.Name, item.Description, (string?)null, item.SourceSegmentIds)));
+            AddItems(response.FunctionalRequirements.Select(item => (SpecificationItemKind.FunctionalRequirement, (string?)item.Title, item.Description, (string?)item.Priority.ToString(), item.SourceSegmentIds)));
+            AddItems(response.UserScenarios.Select(item => (SpecificationItemKind.UserScenario, (string?)item.Title, $"{item.Actor}: {item.Description}", (string?)null, item.SourceSegmentIds)));
+            AddItems(response.Constraints.Select(item => (SpecificationItemKind.Constraint, (string?)null, item.Description, (string?)null, item.SourceSegmentIds)));
+            AddItems(response.Conditions.Select(item => (SpecificationItemKind.Condition, (string?)null, item.Description, (string?)null, item.SourceSegmentIds)));
+            AddItems(response.Agreements.Select(item => (SpecificationItemKind.Agreement, (string?)null, item.Description, (string?)null, item.SourceSegmentIds)));
+            AddItems(response.KeyQuestions.Select(item => (SpecificationItemKind.KeyQuestion, (string?)item.Title, item.Description, (string?)item.Reason.ToString(), item.SourceSegmentIds)));
+
+            analysis.Status = SpecificationAnalysisStatus.Completed;
+            analysis.CompletedAt = DateTimeOffset.UtcNow;
+            analysis.Error = null;
+            await db.SaveChangesAsync(ct);
+            if (transaction is not null) await transaction.CommitAsync(ct);
+
+            void AddItems(IEnumerable<(SpecificationItemKind Kind, string? Title, string Description, string? Priority, IReadOnlyList<Guid> SourceSegmentIds)> items)
+            {
+                foreach (var source in items)
+                {
+                    var item = new SpecificationItem
+                    {
+                        SpecificationAnalysisId = analysis.Id,
+                        SpecificationFunctionId = function.Id,
+                        Kind = source.Kind,
+                        Title = source.Title,
+                        Description = source.Description,
+                        Priority = source.Priority,
+                        SortOrder = sortOrder++,
+                        IsManual = false
+                    };
+                    foreach (var segmentId in source.SourceSegmentIds)
+                    {
+                        var statement = statementsBySegmentId[segmentId];
+                        item.StatementLinks.Add(new SpecificationItemStatement
+                        {
+                            SpecificationItemId = item.Id,
+                            AnalysisStatementId = statement.Id
+                        });
+                    }
+                    function.Items.Add(item);
+                    db.Add(item);
+                    db.AddRange(item.StatementLinks);
+                }
+            }
+        }
+        finally
+        {
+            if (transaction is not null) await transaction.DisposeAsync();
+        }
     }
 
     private async Task PublishStage3Async(

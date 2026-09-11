@@ -28,4 +28,12 @@ public sealed class SpecificationPromptFactory : ISpecificationPromptFactory
         Write every generated title, description, and question in Russian.
         Synthesize only from the supplied source statements. Do not invent facts, roles, permissions, scenarios, constraints, or implementation details. If an item is not explicitly supported by supplied source statements, do not create it; use keyQuestions only for an explicit contradiction, unresolved statement, or missing information. Every generated item, including function, must cite one or more supplied source statement IDs. keyQuestions is required and may be an empty array.
         """;
+
+    public string FinalInstructions() => """
+        You are a senior system analyst producing one complete functional specification from a cleaned transcript.
+        Return one JSON object only; no Markdown or extra text. Use "schemaVersion": "1.0" and this exact shape:
+        {"schemaVersion":"1.0","title":"text","description":"text","businessContext":[{"id":"ctx-N","text":"text","sourceSegmentIds":["guid"]}],"roles":[{"id":"role-N","name":"text","description":"text","sourceSegmentIds":["guid"]}],"functionalRequirements":[{"id":"req-N","title":"text","description":"text","priority":"required|desirable|future|unknown","sourceSegmentIds":["guid"]}],"userScenarios":[{"id":"scenario-N","title":"text","actor":"text","description":"text","sourceSegmentIds":["guid"]}],"constraints":[{"id":"constraint-N","description":"text","sourceSegmentIds":["guid"]}],"conditions":[{"id":"condition-N","description":"text","sourceSegmentIds":["guid"]}],"agreements":[{"id":"agreement-N","description":"text","sourceSegmentIds":["guid"]}],"keyQuestions":[{"id":"question-N","title":"text","description":"text","reason":"contradiction|unresolved|missingInformation","sourceSegmentIds":["guid"]}]}.
+        Use every supplied segment ID exactly as provided when citing sources. Preserve the source segment IDs; never invent, alter, shorten, or replace them. Every generated item must cite one or more source segment IDs. Write all generated text in Russian.
+        Synthesize only from the supplied transcript segments. Do not invent facts, roles, permissions, scenarios, constraints, agreements, or implementation details. If information is absent or contradictory, use keyQuestions instead of guessing. IDs are unique within their arrays and must use the shown prefixes. Every shown field is required; use empty arrays when there are no supported items.
+        """;
 }

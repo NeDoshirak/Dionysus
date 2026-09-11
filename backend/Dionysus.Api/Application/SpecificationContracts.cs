@@ -100,6 +100,60 @@ public sealed record Stage0CleanedSegmentDto(
     [property: JsonRequired] Guid SegmentId,
     [property: JsonRequired] string CleanedText);
 
+public sealed record FinalSpecificationRequest(
+    [property: JsonRequired] string SchemaVersion,
+    [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments) : ISpecificationStageContract;
+
+public sealed record FinalSpecificationResponse(
+    [property: JsonRequired] string SchemaVersion,
+    [property: JsonRequired] string Title,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] IReadOnlyList<FinalBusinessContextDto> BusinessContext,
+    [property: JsonRequired] IReadOnlyList<FinalRoleDto> Roles,
+    [property: JsonRequired] IReadOnlyList<FinalFunctionalRequirementDto> FunctionalRequirements,
+    [property: JsonRequired] IReadOnlyList<FinalUserScenarioDto> UserScenarios,
+    [property: JsonRequired] IReadOnlyList<FinalDescriptionItemDto> Constraints,
+    [property: JsonRequired] IReadOnlyList<FinalDescriptionItemDto> Conditions,
+    [property: JsonRequired] IReadOnlyList<FinalDescriptionItemDto> Agreements,
+    [property: JsonRequired] IReadOnlyList<FinalKeyQuestionDto> KeyQuestions) : ISpecificationStageContract;
+
+public sealed record FinalBusinessContextDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Text,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
+public sealed record FinalRoleDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
+public sealed record FinalFunctionalRequirementDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Title,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] SpecificationPriority Priority,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
+public sealed record FinalUserScenarioDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Title,
+    [property: JsonRequired] string Actor,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
+public sealed record FinalDescriptionItemDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
+public sealed record FinalKeyQuestionDto(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Title,
+    [property: JsonRequired] string Description,
+    [property: JsonRequired] KeyQuestionReason Reason,
+    [property: JsonRequired] IReadOnlyList<Guid> SourceSegmentIds);
+
 public sealed record Stage1ExtractionRequest(
     [property: JsonRequired] string SchemaVersion,
     [property: JsonRequired] IReadOnlyList<StageSegmentDto> Segments) : ISpecificationStageContract;

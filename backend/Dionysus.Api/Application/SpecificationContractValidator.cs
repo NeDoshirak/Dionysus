@@ -52,6 +52,32 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
         }
     }
 
+    public void ValidateFinal(FinalSpecificationRequest input, FinalSpecificationResponse output)
+    {
+        const string stage = "final";
+        RequireVersion(input.SchemaVersion, stage);
+        RequireVersion(output.SchemaVersion, stage);
+        var knownSegmentIds = input.Segments.Select(x => x.Id).ToArray();
+        RequireNonEmptyUniqueGuids(knownSegmentIds, stage, "input-segment-ids");
+        var knownSegments = knownSegmentIds.ToHashSet();
+
+        RequireText(output.Title, stage, "title");
+        RequireText(output.Description, stage, "description");
+        ValidateSourceLinkedItems(output.BusinessContext, x => x.Id, x => x.SourceSegmentIds, ContextId, knownSegments, stage, "context-ids");
+        ValidateSourceLinkedItems(output.Roles, x => x.Id, x => x.SourceSegmentIds, RoleId, knownSegments, stage, "role-ids");
+        ValidateSourceLinkedItems(output.FunctionalRequirements, x => x.Id, x => x.SourceSegmentIds, RequirementId, knownSegments, stage, "requirement-ids");
+        ValidateSourceLinkedItems(output.UserScenarios, x => x.Id, x => x.SourceSegmentIds, ScenarioId, knownSegments, stage, "scenario-ids");
+        ValidateSourceLinkedItems(output.Constraints, x => x.Id, x => x.SourceSegmentIds, ConstraintId, knownSegments, stage, "constraint-ids");
+        ValidateSourceLinkedItems(output.Conditions, x => x.Id, x => x.SourceSegmentIds, ConditionId, knownSegments, stage, "condition-ids");
+        ValidateSourceLinkedItems(output.Agreements, x => x.Id, x => x.SourceSegmentIds, AgreementId, knownSegments, stage, "agreement-ids");
+        ValidateSourceLinkedItems(output.KeyQuestions, x => x.Id, x => x.SourceSegmentIds, QuestionId, knownSegments, stage, "question-ids");
+
+        if (output.FunctionalRequirements.Any(x => !Enum.IsDefined(x.Priority)))
+            Fail(stage, "requirement-priority");
+        if (output.KeyQuestions.Any(x => !Enum.IsDefined(x.Reason)))
+            Fail(stage, "question-reason");
+    }
+
     public void ValidateStage1(IReadOnlyCollection<TranscriptSegment> segments, Stage1ExtractionResponse output)
     {
         const string stage = "stage1";
@@ -228,6 +254,18 @@ public sealed class SpecificationContractValidator : ISpecificationContractValid
         foreach (var item in items)
         {
             ValidateSourceLinkedItem(sources(item), knownIds, stage, "item-sources");
+        }
+    }
+
+    private static void ValidateSourceLinkedItems<T>(IReadOnlyList<T> items, Func<T, string> id, Func<T, IReadOnlyList<Guid>> sources, Regex idFormat, HashSet<Guid> knownIds, string stage, string rule)
+    {
+        RequireUniqueMatchingIds(items.Select(id), idFormat, stage, rule);
+        foreach (var item in items)
+        {
+            var sourceIds = sources(item);
+            if (sourceIds.Count == 0)
+                Fail(stage, "item-sources");
+            RequireKnownSources(sourceIds, knownIds, stage, "item-sources");
         }
     }
 

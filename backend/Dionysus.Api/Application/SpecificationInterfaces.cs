@@ -9,6 +9,7 @@ public interface ISpecificationContractValidator
     void ValidateStage1(IReadOnlyCollection<TranscriptSegment> segments, Stage1ExtractionResponse output);
     void ValidateStage2(Stage1ExtractionResponse input, Stage2ReviewResponse output);
     void ValidateStage3(Stage3FunctionRequest input, Stage3FunctionResponse output);
+    void ValidateFinal(FinalSpecificationRequest input, FinalSpecificationResponse output);
 }
 
 public interface ISpecificationPromptFactory
@@ -17,6 +18,7 @@ public interface ISpecificationPromptFactory
     string Stage1Instructions();
     string Stage2Instructions();
     string Stage3Instructions();
+    string FinalInstructions();
 }
 
 public interface IStructuredSpecificationAiService
@@ -25,6 +27,7 @@ public interface IStructuredSpecificationAiService
     Task<Stage1ExtractionResponse> RunStage1Async(Stage1ExtractionRequest request, CancellationToken ct);
     Task<Stage2ReviewResponse> RunStage2Async(Stage1ExtractionResponse request, CancellationToken ct);
     Task<Stage3FunctionResponse> RunStage3Async(Stage3FunctionRequest request, CancellationToken ct);
+    Task<FinalSpecificationResponse> RunFinalSpecificationAsync(FinalSpecificationRequest request, CancellationToken ct);
 }
 
 public sealed record SpecificationAnalysisJob(Guid AnalysisId, Guid RunId);
