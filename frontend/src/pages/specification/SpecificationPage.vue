@@ -52,7 +52,7 @@ const errorMessage = computed(() => {
 })
 
 const failedAnalysisMessage = computed(() => (
-  specification.value?.errorMessage || 'Не удалось завершить анализ ТЗ.'
+  specification.value?.error || specification.value?.errorMessage || 'Не удалось завершить анализ ТЗ.'
 ))
 
 function getProjectId() {
