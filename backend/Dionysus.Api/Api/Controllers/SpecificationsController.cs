@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,18 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
     {
         var analysis = await LoadAnalysis(projectId, ct);
         return analysis is null ? NotFound() : Ok(SpecificationMapper.ToDetails(analysis));
+    }
+
+    [HttpGet("export/markdown")]
+    public async Task<IActionResult> ExportMarkdown(Guid projectId, CancellationToken ct)
+    {
+        var analysis = await LoadAnalysis(projectId, ct);
+        if (analysis is null) return NotFound();
+        if (analysis.Status != SpecificationAnalysisStatus.Completed) return Conflict(new { detail = "Specification analysis is not completed." });
+
+        var content = SpecificationMarkdownExporter.Export(analysis);
+        var fileName = $"{Slugify(analysis.Project.Name)}-specification.md";
+        return File(Encoding.UTF8.GetBytes(content), "text/markdown", fileName);
     }
 
     [HttpPost("retry")]
@@ -169,10 +182,18 @@ public sealed class SpecificationsController(AppDbContext db, ISpecificationAnal
 
     private Task<SpecificationAnalysis?> LoadAnalysis(Guid projectId, CancellationToken ct) => db.SpecificationAnalyses
         .Where(x => x.ProjectEntityId == projectId && x.Project.OwnerId == UserId)
+        .Include(x => x.Project)
         .Include(x => x.Items).ThenInclude(x => x.StatementLinks).ThenInclude(x => x.AnalysisStatement).ThenInclude(x => x.SegmentLinks).ThenInclude(x => x.TranscriptSegment)
-        .Include(x => x.Functions).ThenInclude(x => x.StatementLinks).ThenInclude(x => x.AnalysisStatement)
+        .Include(x => x.Functions).ThenInclude(x => x.StatementLinks).ThenInclude(x => x.AnalysisStatement).ThenInclude(x => x.SegmentLinks).ThenInclude(x => x.TranscriptSegment)
         .Include(x => x.Functions).ThenInclude(x => x.Items).ThenInclude(x => x.StatementLinks).ThenInclude(x => x.AnalysisStatement).ThenInclude(x => x.SegmentLinks).ThenInclude(x => x.TranscriptSegment)
         .FirstOrDefaultAsync(ct);
+
+    private static string Slugify(string value)
+    {
+        var chars = value.Trim().Select(character => char.IsLetterOrDigit(character) || character is '-' or '_' ? character : '-').ToArray();
+        var slug = new string(chars).Trim('-');
+        return string.IsNullOrWhiteSpace(slug) ? "project" : slug;
+    }
 
     private Task<SpecificationFunction?> LoadFunction(Guid projectId, Guid functionId, CancellationToken ct) => db.SpecificationFunctions
         .Where(x => x.Id == functionId && x.SpecificationAnalysis.ProjectEntityId == projectId && x.SpecificationAnalysis.Project.OwnerId == UserId)
