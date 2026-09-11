@@ -20,7 +20,17 @@ export const itemKindLabels = {
   projectContradiction: 'Противоречие',
 }
 
-const itemKindOrder = {
+export const editableItemKinds = [
+  'functionalRequirement',
+  'role',
+  'userScenario',
+  'constraint',
+  'condition',
+  'agreement',
+  'keyQuestion',
+]
+
+export const itemKindOrder = {
   functionalRequirement: 0,
   role: 1,
   userScenario: 2,
