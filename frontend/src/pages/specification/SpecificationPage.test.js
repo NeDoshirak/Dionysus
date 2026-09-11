@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { nextTick } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getProject, searchProjectTranscription } from '@/entities/project'
 import { getSpecification, retrySpecification } from '@/entities/specification'
@@ -96,7 +96,11 @@ async function mountPage(projectId = 'project-1') {
 
 describe('SpecificationPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('renders the completed workspace after loading the project and specification', async () => {
@@ -131,6 +135,64 @@ describe('SpecificationPage', () => {
     expect(getProject).toHaveBeenCalledTimes(2)
     expect(intervalSpy).not.toHaveBeenCalled()
     intervalSpy.mockRestore()
+  })
+
+  it('polls project details after three seconds while transcription is processing', async () => {
+    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 1)
+    getProject.mockResolvedValue({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    await mountPage('project-1')
+
+    await vi.waitFor(() => expect(timerSpy).toHaveBeenCalledWith(expect.any(Function), 3000))
+    const [reload] = timerSpy.mock.calls.find(([, delay]) => delay === 3000)
+    await reload()
+    await vi.waitFor(() => expect(getProject).toHaveBeenCalledTimes(2))
+    expect(getSpecification).toHaveBeenCalledTimes(2)
+    timerSpy.mockRestore()
+  })
+
+  it('stops transcription polling after a terminal recording status', async () => {
+    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 1)
+    getProject
+      .mockResolvedValueOnce({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
+      .mockResolvedValueOnce({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'completed', segments: [] }] })
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    await mountPage('project-1')
+
+    await vi.waitFor(() => expect(timerSpy).toHaveBeenCalledWith(expect.any(Function), 3000))
+    const [reload] = timerSpy.mock.calls.find(([, delay]) => delay === 3000)
+    await reload()
+    await vi.waitFor(() => expect(getProject).toHaveBeenCalledTimes(2))
+    expect(timerSpy.mock.calls.filter(([, delay]) => delay === 3000)).toHaveLength(1)
+    timerSpy.mockRestore()
+  })
+
+  it('shows the safe transcription error after a failed recording', async () => {
+    getProject.mockResolvedValue({
+      ...projectWithTranscript,
+      recordings: [{ id: 'recording-1', status: 'failed', error: 'Transcription failed.', segments: [] }],
+    })
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Transcription failed.'))
+    expect(wrapper.text()).not.toContain('Анализ ТЗ пока недоступен')
+  })
+
+  it('clears the scheduled transcription refresh when the page unmounts', async () => {
+    const timerSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => 42)
+    const clearTimerSpy = vi.spyOn(global, 'clearTimeout')
+    getProject.mockResolvedValue({ ...projectWithTranscript, recordings: [{ id: 'recording-1', status: 'processing', segments: [] }] })
+    getSpecification.mockRejectedValue({ status: 404 })
+
+    const { wrapper } = await mountPage('project-1')
+
+    await vi.waitFor(() => expect(timerSpy).toHaveBeenCalledWith(expect.any(Function), 3000))
+    wrapper.unmount()
+    expect(clearTimerSpy).toHaveBeenCalledWith(42)
   })
 
   it('ignores a stale load after navigating to another project', async () => {

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getProject } from '@/entities/project'
 import {
@@ -25,6 +25,7 @@ const retryLoading = ref(false)
 const retryError = ref('')
 
 let loadRequestId = 0
+let refreshTimer = null
 
 const projectName = computed(() => (
   project.value?.name || String(route.query.name || `Проект ${route.params.id}`)
@@ -36,9 +37,13 @@ const statusLabel = computed(() => (
     || 'Анализ ТЗ'
 ))
 
+const recording = computed(() => project.value?.recordings?.at(-1) || null)
+
 const viewState = computed(() => {
   if (loading.value) return 'loading'
   if (errorSource.value === 'project') return 'error'
+  if (recording.value?.status === 'failed') return 'transcription-failed'
+  if (recording.value?.status === 'processing') return 'transcription-processing'
   if (error.value?.status === 404) return 'empty'
   if (error.value) return 'error'
   if (specification.value?.status === 'failed') return 'failed'
@@ -55,6 +60,10 @@ const errorMessage = computed(() => {
 
 const failedAnalysisMessage = computed(() => (
   specification.value?.error || specification.value?.errorMessage || 'Не удалось завершить анализ ТЗ.'
+))
+
+const failedTranscriptionMessage = computed(() => (
+  recording.value?.error || 'Не удалось расшифровать запись.'
 ))
 
 function getProjectId() {
@@ -95,6 +104,23 @@ async function loadWorkspace() {
   }
 
   loading.value = false
+  scheduleRefresh()
+}
+
+function clearRefreshTimer() {
+  if (refreshTimer === null) return
+  clearTimeout(refreshTimer)
+  refreshTimer = null
+}
+
+function scheduleRefresh() {
+  clearRefreshTimer()
+  if (recording.value?.status !== 'processing') return
+
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    loadWorkspace()
+  }, 3000)
 }
 
 function openRetry() {
@@ -132,7 +158,11 @@ function refreshWorkspace() {
 }
 
 onMounted(loadWorkspace)
-watch(() => route.params.id, loadWorkspace)
+onBeforeUnmount(clearRefreshTimer)
+watch(() => route.params.id, () => {
+  clearRefreshTimer()
+  loadWorkspace()
+})
 </script>
 
 <template>
@@ -157,6 +187,14 @@ watch(() => route.params.id, loadWorkspace)
 
       <StatusMessage v-else-if="viewState === 'empty'" state="info">
         Анализ ТЗ пока недоступен.
+      </StatusMessage>
+
+      <StatusMessage v-else-if="viewState === 'transcription-failed'" state="error">
+        {{ failedTranscriptionMessage }}
+      </StatusMessage>
+
+      <StatusMessage v-else-if="viewState === 'transcription-processing'" state="info">
+        Расшифровываем запись. Страница обновляется автоматически.
       </StatusMessage>
 
       <section v-else-if="viewState === 'failed'" class="specification-page__state">
