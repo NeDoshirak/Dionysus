@@ -41,6 +41,7 @@ ScaffoldingReadMe.txt
 .idea/
 **/node_modules/
 frontend/dist/
+.worktrees/
 
 # Others
 ~$*
