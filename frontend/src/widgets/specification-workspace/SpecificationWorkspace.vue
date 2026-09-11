@@ -388,13 +388,16 @@ function formatTime(seconds) {
         </main>
 
         <aside class="specification-workspace__aside" aria-label="Запись и транскрипция">
-          <SpecificationPlayer
-            v-if="recording"
-            ref="playerRef"
-            :project-id="projectId"
-            :recording="recording"
-          />
-          <StatusMessage v-else state="info">Запись встречи пока недоступна.</StatusMessage>
+          <KeepAlive>
+            <SpecificationPlayer
+              v-if="recording"
+              ref="playerRef"
+              :key="recording.id"
+              :project-id="projectId"
+              :recording="recording"
+            />
+          </KeepAlive>
+          <StatusMessage v-if="!recording" state="info">Запись встречи пока недоступна.</StatusMessage>
 
           <button
             class="specification-workspace__transcript-toggle"

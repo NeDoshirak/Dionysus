@@ -1,12 +1,24 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import { formatProjectDate, projectStatuses } from '@/entities/project'
+import { exportSpecificationMarkdown } from '@/entities/specification'
 
 defineProps({
   projects: { type: Array, default: () => [] },
   loading: Boolean,
   error: { type: String, default: '' },
 })
+
+async function exportProject(project) {
+  const { blob, fileName } = await exportSpecificationMarkdown(project.id)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -21,15 +33,20 @@ defineProps({
       </span>
     </div>
     <div v-else class="project-list__rows">
-      <RouterLink v-for="project in projects" :key="project.id" class="project-list__row" :to="{ name: 'specification', params: { id: project.id } }">
-        <span class="project-list__file" aria-hidden="true">▣</span>
-        <span class="project-list__details">
-          <strong>{{ project.name }}</strong>
-          <small>Транскрипция встречи</small>
-        </span>
-        <span class="project-list__status" :class="`project-list__status--${project.status}`">{{ projectStatuses[project.status] || project.status }}</span>
-        <time class="project-list__date" :datetime="project.createdAt">{{ formatProjectDate(project.createdAt) }}</time>
-      </RouterLink>
+      <div v-for="project in projects" :key="project.id" class="project-list__row">
+        <RouterLink class="project-list__main" :to="{ name: 'specification', params: { id: project.id } }">
+          <span class="project-list__file" aria-hidden="true">▣</span>
+          <span class="project-list__details">
+            <strong>{{ project.name }}</strong>
+            <small>Транскрипция встречи</small>
+          </span>
+          <span class="project-list__status" :class="`project-list__status--${project.status}`">{{ projectStatuses[project.status] || project.status }}</span>
+          <time class="project-list__date" :datetime="project.createdAt">{{ formatProjectDate(project.createdAt) }}</time>
+        </RouterLink>
+        <button class="project-list__export" type="button" aria-label="Экспортировать спецификацию" title="Экспортировать спецификацию" @click="exportProject(project)">
+          <span aria-hidden="true">↓</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -54,17 +71,27 @@ defineProps({
     align-items: center
     gap: 16px
     min-height: 68px
-    padding: 14px 16px
+    padding: 8px 16px 8px 0
     border-bottom: 1px solid var(--color-border-subtle)
     border-radius: 10px
-    color: var(--color-text)
-    text-decoration: none
 
     &:hover
       background: var(--color-accent-soft)
 
+  &__main
+    display: flex
+    align-items: center
+    flex: 1
+    gap: 16px
+    min-width: 0
+    align-self: stretch
+    padding: 6px 0 6px 16px
+    color: var(--color-text)
+    text-decoration: none
+
   &__file
     display: grid
+    flex: 0 0 52px
     width: 52px
     height: 52px
     place-items: center
@@ -108,6 +135,25 @@ defineProps({
     color: var(--color-muted)
     font-size: 13px
     white-space: nowrap
+
+  &__export
+    display: grid
+    flex: 0 0 36px
+    width: 36px
+    height: 36px
+    place-items: center
+    border: 1px solid var(--color-border-subtle)
+    border-radius: 50%
+    background: var(--color-surface)
+    color: var(--color-accent)
+    cursor: pointer
+    font-size: 18px
+    line-height: 1
+
+    &:hover
+      border-color: var(--color-accent)
+      background: var(--color-accent)
+      color: #ffffff
 
   &__state
     padding: 24px 16px

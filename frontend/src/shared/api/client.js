@@ -30,6 +30,16 @@ export function getAuthenticatedFetchOptions() {
   return { credentials, headers }
 }
 
+export async function apiFetch(path, { authenticated = false, retryOnUnauthorized = true, ...options } = {}) {
+  const response = await fetch(toRequestUrl(path), buildRequestOptions({ ...options, authenticated }))
+
+  if (authenticated && response.status === 401 && retryOnUnauthorized && await callbacks.refreshAccessToken?.()) {
+    return apiFetch(path, { ...options, authenticated, retryOnUnauthorized: false })
+  }
+
+  return response
+}
+
 async function getPayload(response) {
   if (response.status === 204) return undefined
 
@@ -54,11 +64,7 @@ async function toApiError(response) {
 }
 
 export async function apiRequest(path, { authenticated = false, retryOnUnauthorized = true, ...options } = {}) {
-  const response = await fetch(toRequestUrl(path), buildRequestOptions({ ...options, authenticated }))
-
-  if (authenticated && response.status === 401 && retryOnUnauthorized && await callbacks.refreshAccessToken?.()) {
-    return apiRequest(path, { ...options, authenticated, retryOnUnauthorized: false })
-  }
+  const response = await apiFetch(path, { ...options, authenticated, retryOnUnauthorized })
 
   if (!response.ok) {
     if (authenticated && response.status === 401) callbacks.onUnauthorized?.()

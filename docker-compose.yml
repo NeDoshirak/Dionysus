@@ -47,6 +47,9 @@ services:
       VALKEY_CONNECTION: valkey:6379
       JWT_KEY: ${JWT_KEY}
       AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
+      YANDEX_AI_API_KEY: ${YANDEX_AI_API_KEY}
+      YANDEX_AI_FOLDER_ID: ${YANDEX_AI_FOLDER_ID}
+      YANDEX_AI_MODEL: ${YANDEX_AI_MODEL}
       WHISPER_URL: http://whisper:9000
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
       SMTP_HOST: ${SMTP_HOST}
@@ -66,6 +69,7 @@ services:
     build:
       context: ./backend
       target: development
+      network: host
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
@@ -73,6 +77,9 @@ services:
       VALKEY_CONNECTION: valkey:6379
       JWT_KEY: ${JWT_KEY}
       AUTH_CODE_PEPPER: ${AUTH_CODE_PEPPER}
+      YANDEX_AI_API_KEY: ${YANDEX_AI_API_KEY}
+      YANDEX_AI_FOLDER_ID: ${YANDEX_AI_FOLDER_ID}
+      YANDEX_AI_MODEL: ${YANDEX_AI_MODEL}
       WHISPER_URL: http://whisper:9000
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
       SMTP_HOST: ${SMTP_HOST}

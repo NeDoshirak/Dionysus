@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useWaveSurfer } from '@meersagor/wavesurfer-vue'
 import { getAuthenticatedFetchOptions } from '@/shared/api/client'
 import { BaseButton } from '@/shared/ui'
@@ -42,18 +42,46 @@ function formatTime(seconds) {
   return `${minutes}:${restSeconds}`
 }
 
+// Проверяем, что инстанс жив и готов — иначе wavesurfer.js
+// падает на this.options.cursorWidth в renderProgress.
+function hasLivePlayer() {
+  const instance = waveSurfer?.value
+  return Boolean(instance) && Boolean(isReady?.value) && typeof instance.setTime === 'function'
+}
+
 function togglePlayback() {
-  waveSurfer.value?.playPause()
+  if (!hasLivePlayer()) return
+  waveSurfer.value.playPause()
 }
 
 function seek(seconds) {
-  waveSurfer.value?.setTime(seconds)
+  if (!hasLivePlayer()) return
+  waveSurfer.value.setTime(seconds)
 }
 
 function seekFromControl(event) {
-  if (!totalDuration.value) return
+  if (!totalDuration.value || !hasLivePlayer()) return
   seek(Number(event.target.value) / 100 * totalDuration.value)
 }
+
+function destroyPlayer() {
+  const instance = waveSurfer?.value
+  if (!instance) return
+
+  instance.unAll?.()
+  instance.destroy?.()
+
+  if (waveSurfer) waveSurfer.value = null
+}
+
+onBeforeUnmount(destroyPlayer)
+
+watch(
+  () => props.recording?.id,
+  () => {
+    destroyPlayer()
+  },
+)
 
 defineExpose({ seek })
 </script>

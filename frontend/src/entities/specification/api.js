@@ -1,4 +1,4 @@
-import { apiRequest } from '@/shared/api/client'
+import { apiFetch, apiRequest } from '@/shared/api/client'
 import { isDemoMode } from '@/shared/config/demo'
 import { getDemoSpecification } from '@/shared/demo/specification-workspace'
 import { normalizeSpecification, toApiSpecificationItemBody } from './model'
@@ -13,6 +13,19 @@ export const getSpecification = (projectId) => {
   return apiRequest(specificationPath(projectId), { authenticated: true }).then(normalizeSpecification)
 }
 export const retrySpecification = (projectId) => apiRequest(`${specificationPath(projectId)}/retry`, { method: 'POST', authenticated: true })
+export async function exportSpecificationMarkdown(projectId) {
+  const response = await apiFetch(`${specificationPath(projectId)}/export/markdown`, { authenticated: true })
+  if (!response.ok) throw response
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('content-disposition') || ''
+  const fileName = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i)?.[1]
+
+  return {
+    blob,
+    fileName: fileName ? decodeURIComponent(fileName) : 'specification.md',
+  }
+}
 export const createSpecificationFunction = (projectId, body) => apiRequest(`${specificationPath(projectId)}/functions`, { method: 'POST', body, authenticated: true })
 export const updateSpecificationFunction = (projectId, functionId, body) => apiRequest(functionPath(projectId, functionId), { method: 'PATCH', body, authenticated: true })
 export const deleteSpecificationFunction = (projectId, functionId) => apiRequest(functionPath(projectId, functionId), { method: 'DELETE', authenticated: true })
