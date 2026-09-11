@@ -1,36 +1,39 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useWaveSurfer } from '@meersagor/wavesurfer-vue'
-import { getAuthenticatedFetchOptions } from '@/shared/api/client'
+import { getSession } from '@/entities/session'
 import { BaseButton } from '@/shared/ui'
+import SpecificationWaveform from './SpecificationWaveform.vue'
 
 const props = defineProps({
   projectId: { type: String, required: true },
   recording: { type: Object, required: true },
 })
 
-const containerRef = ref(null)
-const streamUrl = computed(() => Object.prototype.hasOwnProperty.call(props.recording, 'streamUrl')
-  ? props.recording.streamUrl
-  : `/api/projects/${encodeURIComponent(props.projectId)}/recordings/${encodeURIComponent(props.recording.id)}/stream`)
-const options = computed(() => ({
-  ...(streamUrl.value ? { url: streamUrl.value } : {}),
-  ...(Array.isArray(props.recording.waveformPeaks) ? { peaks: props.recording.waveformPeaks } : {}),
-  ...(Number.isFinite(props.recording.durationSeconds) ? { duration: props.recording.durationSeconds } : {}),
-  height: 72,
-  waveColor: '#f7b1a7',
-  progressColor: '#f1361d',
-  cursorColor: '#111827',
-  barWidth: 2,
-  barGap: 2,
-  barRadius: 2,
-  fetchParams: getAuthenticatedFetchOptions(),
+const waveformRef = ref(null)
+
+const accessToken = computed(() => getSession()?.accessToken || '')
+
+const streamUrl = computed(() => {
+  const explicit = props.recording?.streamUrl
+  if (typeof explicit === 'string' && explicit.length > 0) return explicit
+  if (!props.projectId || !props.recording?.id) return null
+  return `/api/projects/${encodeURIComponent(props.projectId)}/recordings/${encodeURIComponent(props.recording.id)}/stream`
+})
+
+const fetchParams = computed(() => ({
+  credentials: 'include',
+  headers: accessToken.value ? { Authorization: `Bearer ${accessToken.value}` } : {},
 }))
 
-const { waveSurfer, isReady, isPlaying, currentTime, totalDuration } = useWaveSurfer({
-  containerRef,
-  options,
-})
+const canRender = computed(() => Boolean(streamUrl.value) && Boolean(accessToken.value))
+
+// ключ: пересоздаём wavesurfer при смене url или токена
+const waveformKey = computed(() => `${streamUrl.value}::${accessToken.value.slice(0, 12)}`)
+
+const isReady = ref(false)
+const isPlaying = ref(false)
+const currentTime = ref(0)
+const totalDuration = ref(0)
 
 const progress = computed(() => totalDuration.value ? currentTime.value / totalDuration.value * 100 : 0)
 
@@ -38,50 +41,53 @@ function formatTime(seconds) {
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0))
   const minutes = Math.floor(safeSeconds / 60)
   const restSeconds = String(safeSeconds % 60).padStart(2, '0')
-
   return `${minutes}:${restSeconds}`
 }
 
-// Проверяем, что инстанс жив и готов — иначе wavesurfer.js
-// падает на this.options.cursorWidth в renderProgress.
-function hasLivePlayer() {
-  const instance = waveSurfer?.value
-  return Boolean(instance) && Boolean(isReady?.value) && typeof instance.setTime === 'function'
+function onWaveformReady(ws) {
+  console.log('[player] waveform ready, duration', ws.getDuration())
+  isReady.value = true
+  totalDuration.value = ws.getDuration() || 0
 }
 
+function onWaveformError(err) {
+  console.error('[player] waveform error', err)
+  isReady.value = false
+}
+
+function onTimeUpdate(time) {
+  currentTime.value = Number(time) || 0
+}
+
+function onPlay() { isPlaying.value = true }
+function onPause() { isPlaying.value = false }
+function onFinish() { isPlaying.value = false }
+
 function togglePlayback() {
-  if (!hasLivePlayer()) return
-  waveSurfer.value.playPause()
+  if (!isReady.value) return
+  waveformRef.value?.playPause()
 }
 
 function seek(seconds) {
-  if (!hasLivePlayer()) return
-  waveSurfer.value.setTime(seconds)
+  if (!isReady.value) return
+  waveformRef.value?.seek(seconds)
 }
 
 function seekFromControl(event) {
-  if (!totalDuration.value || !hasLivePlayer()) return
+  if (!totalDuration.value || !isReady.value) return
   seek(Number(event.target.value) / 100 * totalDuration.value)
 }
 
-function destroyPlayer() {
-  const instance = waveSurfer?.value
-  if (!instance) return
+watch(() => props.recording?.id, () => {
+  isReady.value = false
+  isPlaying.value = false
+  currentTime.value = 0
+  totalDuration.value = 0
+})
 
-  instance.unAll?.()
-  instance.destroy?.()
-
-  if (waveSurfer) waveSurfer.value = null
-}
-
-onBeforeUnmount(destroyPlayer)
-
-watch(
-  () => props.recording?.id,
-  () => {
-    destroyPlayer()
-  },
-)
+onBeforeUnmount(() => {
+  isReady.value = false
+})
 
 defineExpose({ seek })
 </script>
@@ -100,7 +106,22 @@ defineExpose({ seek })
       </BaseButton>
     </div>
 
-    <div ref="containerRef" class="specification-player__waveform" />
+    <SpecificationWaveform
+      v-if="canRender"
+      :key="waveformKey"
+      ref="waveformRef"
+      :url="streamUrl"
+      :fetch-params="fetchParams"
+      @ready="onWaveformReady"
+      @error="onWaveformError"
+      @timeupdate="onTimeUpdate"
+      @play="onPlay"
+      @pause="onPause"
+      @finish="onFinish"
+    />
+    <div v-else class="specification-player__waveform specification-player__waveform--placeholder">
+      Загружаем запись...
+    </div>
 
     <label class="specification-player__range">
       <span class="specification-player__range-label">Позиция воспроизведения</span>
@@ -145,6 +166,12 @@ defineExpose({ seek })
 
   &__waveform
     min-height: 72px
+
+    &--placeholder
+      display: grid
+      place-items: center
+      color: var(--color-muted)
+      font-size: 14px
 
   &__range
     display: grid

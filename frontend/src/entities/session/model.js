@@ -1,13 +1,20 @@
-let session = null
+import { ref } from 'vue'
+
+const sessionRef = ref(null)
 
 export function setSession(nextSession) {
-  session = { ...nextSession }
+  sessionRef.value = nextSession ? { ...nextSession } : null
 }
 
 export function getSession() {
-  return session ? { ...session } : null
+  return sessionRef.value ? { ...sessionRef.value } : null
 }
 
 export function clearSession() {
-  session = null
+  sessionRef.value = null
+}
+
+// опционально, если где-то нужен реактивный доступ напрямую
+export function useSession() {
+  return sessionRef
 }
