@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 
 import SpecificationWorkspace from './SpecificationWorkspace.vue'
 
@@ -175,6 +175,21 @@ it('filters the transcript locally without calling a search API', async () => {
   expect(projectApi.searchProjectTranscription).not.toHaveBeenCalled()
   expect(fetchSpy).not.toHaveBeenCalled()
   fetchSpy.mockRestore()
+})
+
+it('can collapse the transcript panel for the compact workspace layout', async () => {
+  const wrapper = mountWorkspace()
+  const toggle = wrapper.get('[data-action="toggle-transcript"]')
+  const panel = wrapper.get('#specification-transcript-panel')
+
+  expect(toggle.attributes('aria-expanded')).toBe('true')
+  expect(panel.isVisible()).toBe(true)
+
+  await toggle.trigger('click')
+  await nextTick()
+
+  expect(toggle.attributes('aria-expanded')).toBe('false')
+  expect(panel.attributes('style')).toContain('display: none')
 })
 
 it('keeps selected source evidence visible when a transcript filter is active', async () => {
