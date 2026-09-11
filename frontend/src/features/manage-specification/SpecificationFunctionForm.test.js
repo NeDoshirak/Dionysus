@@ -29,6 +29,30 @@ describe('SpecificationFunctionForm', () => {
     }])
   })
 
+  it('uses empty source statements when create mode receives a residual function', async () => {
+    const wrapper = mountForm({
+      sortOrder: 7,
+      functionItem: {
+        id: 'function-previous',
+        title: 'Previous function',
+        description: 'Previous description',
+        sortOrder: 2,
+        sourceStatementIds: ['statement-leak'],
+      },
+    })
+
+    await wrapper.get('[name="title"]').setValue('Authentication')
+    await wrapper.get('textarea[name="description"]').setValue('Access control and sign-in')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('save')[0]).toEqual([{
+      title: 'Authentication',
+      description: 'Access control and sign-in',
+      sortOrder: 7,
+      sourceStatementIds: [],
+    }])
+  })
+
   it('preserves source statements when editing and keeps values with request errors', async () => {
     const wrapper = mountForm({
       mode: 'edit',

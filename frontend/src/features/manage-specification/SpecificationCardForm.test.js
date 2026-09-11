@@ -32,6 +32,33 @@ describe('SpecificationCardForm', () => {
     }])
   })
 
+  it('uses empty source statements when create mode receives a residual item', async () => {
+    const wrapper = mountForm({
+      item: {
+        id: 'item-previous',
+        kind: 'functionalRequirement',
+        title: 'Previous title',
+        description: 'Previous description',
+        priority: 'desirable',
+        sourceStatementIds: ['statement-leak'],
+      },
+    })
+
+    await wrapper.get('[name="kind"]').setValue('functionalRequirement')
+    await wrapper.get('[name="title"]').setValue('SSO')
+    await wrapper.get('textarea[name="description"]').setValue('Use corporate sign-in')
+    await wrapper.get('[name="priority"]').setValue('required')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('save')[0]).toEqual([{
+      kind: 'functionalRequirement',
+      title: 'SSO',
+      description: 'Use corporate sign-in',
+      priority: 'required',
+      sourceStatementIds: [],
+    }])
+  })
+
   it('preserves source statements and omits priority when editing a role', async () => {
     const wrapper = mountForm({
       mode: 'edit',

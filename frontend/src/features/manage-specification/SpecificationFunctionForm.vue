@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { BaseButton, BaseDialog, BaseInput } from '@/shared/ui'
 
 const props = defineProps({
@@ -14,6 +14,7 @@ const emit = defineEmits(['save', 'cancel'])
 const title = ref('')
 const description = ref('')
 const descriptionError = ref('')
+const isEdit = computed(() => props.mode === 'edit' && props.functionItem)
 
 watch(() => [props.open, props.functionItem, props.mode], () => {
   title.value = props.functionItem?.title || ''
@@ -28,8 +29,8 @@ function submit() {
   emit('save', {
     title: title.value.trim(),
     description: description.value.trim(),
-    sortOrder: props.functionItem?.sortOrder ?? props.sortOrder,
-    sourceStatementIds: props.functionItem?.sourceStatementIds ? [...props.functionItem.sourceStatementIds] : [],
+    sortOrder: isEdit.value ? props.functionItem.sortOrder : props.sortOrder,
+    sourceStatementIds: isEdit.value && props.functionItem?.sourceStatementIds ? [...props.functionItem.sourceStatementIds] : [],
   })
 }
 </script>
