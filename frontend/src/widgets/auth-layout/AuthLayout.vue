@@ -1,16 +1,7 @@
 <template>
-  <main class="auth-layout">
-    <aside class="auth-layout__panel" aria-label="О продукте">
-      <div class="auth-layout__image-placeholder" role="img" aria-label="Декоративная иллюстрация SpecScribe">Иллюстрация</div>
-      <div class="auth-layout__panel-copy">
-        <p class="auth-layout__slogan">Ваши встречи — в структурированные ТЗ</p>
-        <p class="auth-layout__benefits">ИИ-анализ · Автоматические требования · Экспорт</p>
-      </div>
-    </aside>
-    <section class="auth-layout__content">
-      <div class="auth-layout__card"><slot /></div>
-    </section>
-  </main>
+  <section class="auth-layout__content">
+    <div class="auth-layout__card"><slot /></div>
+  </section>
 </template>
 
 <style scoped lang="sass">
