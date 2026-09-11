@@ -204,33 +204,35 @@ watch(() => route.params.id, () => {
         Расшифровываем запись. Страница обновляется автоматически.
       </StatusMessage>
 
-      <section v-else-if="viewState === 'failed'" class="specification-page__state">
-        <StatusMessage state="error">
-          <strong>{{ statusLabel }}</strong>
-          <span class="specification-page__state-description">{{ failedAnalysisMessage }}</span>
-        </StatusMessage>
-        <BaseButton type="button" data-action="retry-analysis" @click="openRetry">
-          Повторить анализ
-        </BaseButton>
-      </section>
+      <template v-else>
+        <section v-if="viewState === 'failed'" class="specification-page__state">
+          <StatusMessage state="error">
+            <strong>{{ statusLabel }}</strong>
+            <span class="specification-page__state-description">{{ failedAnalysisMessage }}</span>
+          </StatusMessage>
+          <BaseButton type="button" data-action="retry-analysis" @click="openRetry">
+            Повторить анализ
+          </BaseButton>
+        </section>
 
-      <section v-else-if="viewState === 'processing'" class="specification-page__state">
-        <StatusMessage state="info">
-          Анализ ТЗ: {{ statusLabel }}. Обновите данные вручную, когда обработка завершится.
-        </StatusMessage>
-        <BaseButton type="button" variant="outline" data-action="refresh-analysis" @click="refreshWorkspace">
-          Обновить
-        </BaseButton>
-      </section>
+        <section v-else-if="viewState === 'processing'" class="specification-page__state">
+          <StatusMessage state="info">
+            Анализ ТЗ: {{ statusLabel }}. Обновите данные вручную, когда обработка завершится.
+          </StatusMessage>
+          <BaseButton type="button" variant="outline" data-action="refresh-analysis" @click="refreshWorkspace">
+            Обновить
+          </BaseButton>
+        </section>
 
-      <SpecificationWorkspace
-        v-else
-        :project-id="getProjectId()"
-        :project="project"
-        :specification="specification"
-        @changed="refreshWorkspace"
-        @refresh="refreshWorkspace"
-      />
+        <SpecificationWorkspace
+          v-if="specification && project"
+          :project-id="getProjectId()"
+          :project="project"
+          :specification="specification"
+          @changed="refreshWorkspace"
+          @refresh="refreshWorkspace"
+        />
+      </template>
 
       <div v-if="retryOpen" class="specification-page__retry-confirm" data-action="confirm-retry" @click.self="confirmRetry">
         <SpecificationConfirmDialog
